@@ -1,0 +1,15 @@
+{
+    "split_keys":
+        [
+            ";"
+        ],
+    "remove_keys":
+        [
+            "ung."
+        ],
+    "remove_between_keys":
+        [
+            ["(", ")"],
+            ["/", "/"]
+        ]
+}
