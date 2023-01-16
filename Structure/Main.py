@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from PIL import Image, ImageFont, ImageDraw
+
+from Bezier import connect
+
 
 class Node:
     """
@@ -10,6 +14,7 @@ class Node:
     for the latter.
     """
 
+    # <editor-fold desc="other">
     def __init__(self, data):
         """
         THIS IS NOT IMPLEMENTED
@@ -31,6 +36,9 @@ class Node:
         self.children = set()
         self.parents = set()
 
+    def __repr__(self):
+        return self.data
+
     @property
     def siblings(self):
         out = set()
@@ -51,7 +59,17 @@ class Node:
                     out.add(child)
         return out
 
-    # child / parent managing
+    @property
+    def word_exclusive_child(self):
+        if len(self.children) == 1:
+            only_child = next(iter(self.children))
+            if len(only_child.data) == 1:
+                if len(only_child.parents) == 1:
+                    return only_child
+
+    # </editor-fold>
+
+    # <editor-fold desc="child / parent managing">
     def remove_connection(self, child):
         self.children.remove(child)
         child.parents.remove(self)
@@ -154,8 +172,9 @@ class Node:
     def sandwich(a, b, c):
         a.get_tail().adopt(b.get_head())
         b.get_tail().adopt(c.get_head())
+    # </editor-fold>
 
-    # data retrieve
+    # <editor-fold desc="data retrieve">
     def get_all(self) -> set[Node]:
         last_len = 0
         cataloged = set()
@@ -174,7 +193,8 @@ class Node:
         for parent in self.parents:
             if parent.data == "head":
                 return parent
-            head.append(parent.get_head())
+            if parent != self:
+                head.append(parent.get_head())
         if len(head) == 1:
             return head[0]
         if len(head) == 0:
@@ -206,8 +226,9 @@ class Node:
             else:
                 connections.add(parent)
         return connections
+    # </editor-fold>
 
-    # data fixers
+    # <editor-fold desc="data fixers">
     def point_remove(self):
         for node in self.get_all():
             if node.data == "point":
@@ -325,6 +346,9 @@ class Node:
                         if len(direct_parents) >= max(len(parents), len(children)):
                             connection_options.append((i, direct_parents, children, parents))
 
+                    if len(connection_options) == 0:
+                        break
+
                     i, _, children, parents = \
                         max(connection_options, key=lambda x: len(x[1]))
                     possible_connection_options.pop(i)
@@ -342,48 +366,27 @@ class Node:
     def sync(self):
         self.make_head_tail()
         self.point_simplify()
+    # </editor-fold>
 
-    # display functions
-    def print(self, ide=None):
-        def push_forward(thing):
+    # <editor-fold desc="display functions">
+    def sectioned_list(self: Node):
+        def push_forward(node):
             for x in layers:
                 try:
-                    x.remove(thing)
+                    x.remove(node)
                 except ValueError:
                     pass
+                else:
+                    things.remove(node)
 
-        layers = [[self.get_head()]]
-        some_name = layers[-1].copy()
-        while 0 < len(some_name):
-            for part in some_name:
-                some_name.pop(0)
-                if any(part in x for x in layers[:-1]):
-                    continue
-                if part.data == "tail":
-                    continue
-                layers.append([])
-                for sub_part in part.children:
-                    push_forward(sub_part)
-                    layers[-1].append(sub_part)
-                    some_name.append(sub_part)
+        def word_extend(node):
+            if len(node.children) == 1:
+                one_child = next(iter(node.children))
+                if len(one_child.parents) == 1 and len(one_child.data) == 1:
+                    return [node] + word_extend(one_child)
+            return [node]
 
-        if ide is None:
-            print(layers)
-        else:
-            print(ide, layers)
-        return layers
-
-    def sectioned_list(self):
-        def push_children(parent):
-            for child in parent.children:
-                for x in layers:
-                    try:
-                        x.remove(child)
-                    except ValueError:
-                        pass
-                    else:
-                        things.remove(child)
-
+        ignore_push = set()  # don't push anything from ignore
         things = []
         layers = []
         queue = [self.get_head()]
@@ -394,15 +397,21 @@ class Node:
             things += queue
 
             for thing in queue:
-                if things.count(thing) == 1:
-                    push_children(thing)
-                    next_queue |= thing.children
+                if things.count(thing) == 1:  # same as "< 2"
+                    children = set(x for x in thing.children if x != thing) - ignore_push
+                    for child in children:
+                        if child not in ignore_push:
+                            push_forward(child)
+                            temp = set(word_extend(child))
+                            next_queue |= temp
+                            temp.remove(child)
+                            ignore_push |= temp
 
             queue = list(next_queue)
 
         return layers
 
-    def order_list(self):
+    def order_list(self: Node):
         things_left: list[list[Node]] = self.sectioned_list()
         path: list[Node] = [self.get_head()]
         ordered: list[list[Node]] = [[] for _ in range(len(things_left))]
@@ -412,9 +421,20 @@ class Node:
             cur = path[-1]
             pos = len(path) - 1
 
-            # prio: child => super_sibling => sibling => parent
+            # prio:  same_row_reference => child => super_sibling => parent
+            # prio pos dif: (0) => (> 0) => ("0") => (< 0)
+
+            # same_row_reference
+            if len(cur.children) == 1 and cur.children & set(things_left[pos]):
+                one_child = next(iter(cur.children))
+                if len(one_child.parents) == 1:
+                    things_left[pos].remove(one_child)
+                    ordered[pos].append(one_child)
+                    path[-1] = one_child
+                    continue
+
+            # child
             if pos + 1 < len(things_left):
-                # child
                 t = list(cur.children & set(things_left[pos + 1]))
                 if t:
                     things_left[pos + 1].remove(t[0])
@@ -430,74 +450,115 @@ class Node:
                 path[-1] = t[0]
                 continue
 
-            # siblings
-            t = list(cur.siblings & set(things_left[pos]))
-            if t:
-                things_left[pos].remove(t[0])
-                ordered[pos].append(t[0])
-                path[-1] = t[0]
-                continue
+            # # siblings
+            # t = list(cur.siblings & set(things_left[pos]))
+            # if t:
+            #     things_left[pos].remove(t[0])
+            #     ordered[pos].append(t[0])
+            #     path[-1] = t[0]
+            #     continue
 
             # parent
             path.pop(-1)
 
         return ordered
 
-    def display(self):
-        def get_step_up():
-            j = i - 1
-            while j > 0:
-                for thing in or_lay[j]:
-                    temp = get_next_step(j + 1, thing)
-                    if temp:
-                        return j, temp
+    def display_nodes(self: Node):
+        # might need to check if node.word_exclusive_child is in column
+        def recursion(node):
+            temp = node.word_exclusive_child
+            if temp:
+                return [node, *recursion(temp)]
+            return [node]
 
-                j -= 1
-            return False
+        if len(self.data) == 1:
+            return recursion(self)
+        return []
 
-        def get_next_step(j, thing):
-            j += 1
-            while j < len(layers):
-                for child in thing.children:
-                    try:
-                        k = layers[j].index(child)
-                        new_val = layers[j][k]
-                        layers[j].pop(k)
-                        or_lay[j].append(new_val)
-                        return j, new_val
+    @staticmethod
+    def convert_nodes_text(nodes: list[Node]):
+        word = ""
+        for node in nodes:
+            word += node.data
+        return word
 
-                    except ValueError:
-                        pass
+    def get_width(self):
+        return font.getbbox(
+            self.convert_nodes_text(self.display_nodes())
+        )[2]
 
-                j += 1
-            return False
 
-        # organize
-        layers = self.sectioned_list()
-        or_lay = [[] for _ in range(len(layers))]
+    def gui_convert(self: Node, text_size=100):
+        # ordered_list = structure.order_list()
+        global font
 
-        layers[0] = []
-        current = self.get_head()
-        or_lay[0] = [current]
+        # ordered_list = [["head", ], ["a", "b", "c", ], ["d", "point", ], ["e", "f", "g", ], ["tail", ]]
+        ordered_list = self.order_list()
 
-        i = 0
-        while True:
-            # if len(or_lay) + 1 > i:
-            #     or_lay.append([])
-            x = get_next_step(i, current)
-            if x:
-                i, current = x
-            else:
-                x = get_step_up()
-                if x:
-                    i, current = x
-                else:
-                    break
-        print(or_lay)
+        font = ImageFont.truetype('arial.ttf', text_size)
+        _, _, x_margin, text_height = font.getbbox("ooo")
+        y_margin = text_height // 2
 
-    def __repr__(self):
-        return self.data
+        text_x = []
+        for col in ordered_list:
+            max_x = 0
+            for node in col:
+                max_x = max(node.get_width(), max_x)
+            text_x.append(max_x)
 
+        text_y = [text_height * len(col) for col in ordered_list]
+        # print(text_x, text_y)
+
+        img = Image.new("RGBA", (
+            sum(text_x) + x_margin * (len(text_x) - 1),
+            max(text_y) + y_margin * (len(text_y) - 1)))
+        draw = ImageDraw.Draw(img)
+
+        text_pos = {}
+        for i, col in enumerate(ordered_list):
+            x_pos = sum(text_x[:i]) + i * x_margin
+
+            for j, row in enumerate(col):
+                y_pos = j * (text_height + y_margin)
+                width = row.get_width()
+
+                text_pos[row] = x_pos, y_pos, width, col
+
+        text_pos_left = text_pos.copy()
+        while len(text_pos_left) > 0:
+            # img.show()
+            node = next(iter(text_pos_left.keys()))
+            x, y, w, col = text_pos[node]
+            del text_pos_left[node]
+
+            if len(node.data) == 1:
+                nodes_displayed = node.display_nodes()
+                for rm_node in nodes_displayed:
+                    text_pos_left.pop(rm_node, None)
+                draw.text((x, y), node.convert_nodes_text(nodes_displayed), fill=(0, 0, 0), font=font)
+                w = node.get_width()
+                node = nodes_displayed[-1]
+
+            if node.data == "head":
+                for child in node.children:
+                    cx, cy, cw, _ = text_pos[child]
+                    draw.line(((0, cy + text_height // 2),
+                               (cx, cy + text_height // 2)))
+                continue
+            for child in node.children:
+                cx, cy, cw, _ = text_pos[child]
+                if child.data == "tail":
+                    draw.line(((x + w, y + text_height // 2),
+                               (cx + cw + 10, y + text_height // 2)))
+
+                    continue
+                draw.line(connect((x + w, y + text_height // 2),
+                                  (cx, cy + text_height // 2)))
+                # draw.line(((x + w, y + text_height // 2),
+                #           (cx, cy + text_height // 2)))
+
+        img.show()
+    # </editor-fold>
 
 # todo rename "thing" to "node"
 # todo add typehints
