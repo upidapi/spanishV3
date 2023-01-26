@@ -1,12 +1,28 @@
 from Main import Node
+from Constructor import convert
+a = convert("hello")
+b = convert("hi")
+c = convert("today")
+d = convert("uh")
+e = convert("eee")
+
+a.get_head().adopt(b)
+a.make_head_tail()
+
+c.get_head().adopt(d)
+a.merge(c)
+a.get_head().adopt(e)
+a.make_head_tail()
+print(a.order_list())
+a.gui_convert()
 # import pygame as pg
 
-a = Node("a")
-b = Node("b")
-c = Node("c")
-d = Node("d")
-e = Node("e")
-f = Node("f")
+# a = Node("a")
+# b = Node("b")
+# c = Node("c")
+# d = Node("d")
+# e = Node("e")
+# f = Node("f")
 
 # a.adopt(d)
 # a.adopt(e)
@@ -34,9 +50,9 @@ f = Node("f")
 # print(a.order_list())
 
 
-a.adopt(c)
-a.sync()
-print(a.gui_convert())
+# a.adopt(c)
+# a.sync()
+# print(a.gui_convert())
 # print(1, a.sectioned_list())
 # a.r_insert(z)
 # print(2, a.sectioned_list())

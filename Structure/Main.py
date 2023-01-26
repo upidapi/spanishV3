@@ -32,9 +32,9 @@ class Node:
             "tail" the abs end (gets removed when merged)
             "point" always 'skipped' simplifies structures
         """
-        self.data = data
-        self.children = set()
-        self.parents = set()
+        self.data: str = data
+        self.children: set[Node] = set()
+        self.parents: set[Node] = set()
 
     def __repr__(self):
         return self.data
@@ -168,10 +168,9 @@ class Node:
                     parent.adopt(child)
             self.remove()
 
-    @staticmethod
-    def sandwich(a, b, c):
-        a.get_tail().adopt(b.get_head())
-        b.get_tail().adopt(c.get_head())
+    def merge(self, other):
+        self.get_tail().adopt(other.get_head())
+
     # </editor-fold>
 
     # <editor-fold desc="data retrieve">
@@ -369,7 +368,7 @@ class Node:
     # </editor-fold>
 
     # <editor-fold desc="display functions">
-    def sectioned_list(self: Node):
+    def sectioned_list_word_combine(self: Node):
         def push_forward(node):
             for x in layers:
                 try:
@@ -411,8 +410,174 @@ class Node:
 
         return layers
 
+    def sectioned_list(self: Node):
+        def remove_from_layers(node):
+            for x in layers:
+                try:
+                    x.remove(node)
+                except ValueError:
+                    pass
+                else:
+                    things.remove(node)
+
+        things = []
+        layers = []
+        queue = [self.get_head()]
+
+        while len(queue) > 0:
+            next_queue = set()
+            layers.append(queue)
+            things += queue
+
+            for thing in queue:
+                if things.count(thing) == 1:  # same as "< 2"
+                    children = set(x for x in thing.children if x != thing)  # don't push self
+                    next_queue |= set(children)
+
+                    for child in children:
+                        remove_from_layers(child)
+
+            queue = list(next_queue)
+
+        return layers
+
+    def f_ch(self, sectioned_list):
+        # todo might optimize (very inefficient)
+        for i, part in enumerate(sectioned_list):
+            if self in part:
+                out = []
+                for f_part in sectioned_list:
+                    out += f_part
+                return out
+
+    # def section_groups(self: Node):
+    #     sectioned_list = self.sectioned_list()
+    #     f_ch = self.f_ch(sectioned_list)
+    #     if len(f_ch) == 1:
+
+    def section_groups(self: Node):
+        sectioned_list = self.sectioned_list_word_combine()
+        queue = [self.get_head()]
+
+        while len(queue) > 0:
+            cur = queue[-1]
+
+    def box_convert(self: Node):
+        def section_index(node: Node) -> int:
+            for i, part in enumerate(sectioned_list):
+                if node in part:
+                    return i
+
+        def in_front(node: Node) -> list[Node]:
+            out = []
+            node_index = section_index(node)
+            for part in sectioned_list[node_index:]:
+                out += part
+            return out
+
+        def behind(node: Node) -> list[Node]:
+            out = []
+            node_index = section_index(node)
+            for part in sectioned_list[:node_index]:
+                out += part
+            return out
+
+        def children_in_front(node: Node) -> set[Node]:
+            return node.children & set(in_front(node))
+
+        def parents_behind(node: Node) -> set[Node]:
+            return node.parents & set(behind(node))
+
+        # <editor-fold desc="separated parts">
+        def get_last_node(children) -> tuple[Node, int]:
+            shared_forward_nodes = set.intersection(*[in_front(child) for child in children])
+
+            # add all children in "f_ch" that are before the first "shared_forward_nodes" to
+            # "nodes_to_iterate"
+            for part in enumerate(sectioned_list):
+                # break when it finds the first "shared_forward_nodes"
+                if any(x in shared_forward_nodes for x in part):
+                    # get the last_node
+                    last_node = shared_forward_nodes & set(part)
+
+                    if len(last_node) > 1:
+                        raise f"there should be a point from " \
+                              f"{[x.data for x in shared_forward_nodes]} to" \
+                              f"{[x.data for x in last_node]}"
+
+                    last_node = next(iter(last_node))
+                    return last_node
+        # </editor-fold>
+
+        # name is fucking misleading
+        def iterate_to(start: Node, end: Node):
+            behind_end = parents_behind(end)
+            node_iter = start
+            part_struct = [start]
+
+            while True:
+                next_node, sub_part_struct = step_forward(node_iter)
+                part_struct += sub_part_struct
+
+                if next_node in behind_end:  # not checking if it's in front
+                    return part_struct
+                else:
+                    node_iter = next_node
+
+        def step_forward(node: Node, struct_part=None) -> tuple[set[Node], list[Node | list]]:  # , structure):
+            if struct_part is None:
+                struct_part = []
+
+            f_ch = children_in_front(node)
+
+            if len(f_ch) == 0:
+                raise "wut"
+            if len(f_ch) == 1:
+                return f_ch, struct_part + [node]
+
+            last_node, last_index = get_last_node(f_ch)
+            nodes_before_last = set(behind(last_node))
+
+            nodes_connected_to_last = []
+            stepped_forward = f_ch.copy()
+
+            for child in set(stepped_forward) & nodes_before_last:
+                sub_nodes_before_last, sub_struct_part = iterate_to(child, last_node)
+                struct_part += sub_struct_part
+                nodes_before_last.add(sub_nodes_before_last)
+
+            # while True:
+            #     nodes_to_iterate = set(stepped_forward) & nodes_before_last  # nodes to step forward later
+            #
+            #     if not len(nodes_to_iterate):
+            #         break
+            #
+            #     stepped_forward = []
+            #     for child in nodes_to_iterate:
+            #         next_nodes, sub_part_struct = step_forward(child)
+            #
+            #         if child in parents_behind(last_node) or \
+            #                 len(next_nodes) > 1:
+            #             nodes_connected_to_last += next_nodes
+            #             continue
+            #
+            #         stepped_forward += next_nodes
+
+            # if we have all f_connections to last_node
+
+            struct_part.append(nodes_connected_to_last)
+            if len(parents_behind(last_node)) == len(nodes_connected_to_last):
+                struct_part.append(last_node)
+
+                return {last_node}, struct_part
+            return set(nodes_connected_to_last), struct_part
+
+        sectioned_list = self.sectioned_list_word_combine()
+
+        return iterate_to(self.get_head(), self.get_tail())
+
     def order_list(self: Node):
-        things_left: list[list[Node]] = self.sectioned_list()
+        things_left: list[list[Node]] = self.sectioned_list_word_combine()
         path: list[Node] = [self.get_head()]
         ordered: list[list[Node]] = [[] for _ in range(len(things_left))]
         ordered[0] = path.copy()
