@@ -488,9 +488,19 @@ class Node:
         def parents_behind(node: Node) -> set[Node]:
             return node.parents & set(behind(node))
 
+        def e_cn(node: Node) -> set[Node]:
+            """
+            all nodes that current node eventually leeds to
+            """
+            out = children_in_front(node)
+            for child in out.copy():
+                out |= e_cn(child)
+
+            return out
+
         # <editor-fold desc="separated parts">
         def get_last_node(children) -> tuple[Node, int]:
-            shared_forward_nodes = set.intersection(*[in_front(child) for child in children])
+            shared_forward_nodes = set.intersection(*[e_cn(child) for child in children])
 
             # add all children in "f_ch" that are before the first "shared_forward_nodes" to
             # "nodes_to_iterate"
@@ -505,7 +515,9 @@ class Node:
                               f"{[x.data for x in shared_forward_nodes]} to" \
                               f"{[x.data for x in last_node]}"
 
-                    last_node = next(iter(last_node))
+                    last_node = last_node.pop()
+
+
                     return last_node
         # </editor-fold>
 
@@ -519,10 +531,12 @@ class Node:
                 next_node, sub_part_struct = step_forward(node_iter)
                 part_struct += sub_part_struct
 
-                if next_node in behind_end:  # not checking if it's in front
-                    return part_struct
-                else:
-                    node_iter = next_node
+                if len(next_node) == 1:
+                    next_node = next(iter(next_node))
+                    if next_node in behind_end:  # not checking if it's in front
+                        return part_struct
+                    else:
+                        node_iter = next_node
 
         def step_forward(node: Node, struct_part=None) -> tuple[set[Node], list[Node | list]]:  # , structure):
             if struct_part is None:
@@ -530,10 +544,8 @@ class Node:
 
             f_ch = children_in_front(node)
 
-            if len(f_ch) == 0:
-                raise "wut"
             if len(f_ch) == 1:
-                return f_ch, struct_part + [node]
+                return f_ch, [node]
 
             last_node, last_index = get_last_node(f_ch)
             nodes_before_last = set(behind(last_node))
@@ -574,7 +586,7 @@ class Node:
 
         sectioned_list = self.sectioned_list_word_combine()
 
-        return iterate_to(self.get_head(), self.get_tail())
+        return iterate_to(self.get_head(), self.get_tail()) + [self.get_tail()]
 
     def order_list(self: Node):
         things_left: list[list[Node]] = self.sectioned_list_word_combine()
