@@ -1,20 +1,31 @@
 from Main import Node
 from Constructor import convert
-a = convert("hello")
-b = convert("hi")
-c = convert("today")
-d = convert("uh")
-e = convert("eee")
+# a = convert("hello")
+# b = convert("hi")
+# c = convert("today")
+# d = convert("uh")
+# e = convert("eee")
+a = Node("a")
+b = Node("b")
+c = Node("c")
+d = Node("d")
 
-a.get_head().adopt(b)
+a.adopt(b)
+b.adopt(d)
+c.parallelize(b)
 a.make_head_tail()
+print(a.box_convert())
 
-c.get_head().adopt(d)
-a.merge(c)
-a.get_head().adopt(e)
-a.make_head_tail()
-print(a.order_list())
-a.gui_convert()
+
+# a.get_head().adopt(b)
+# a.make_head_tail()
+#
+# c.get_head().adopt(d)
+# a.merge(c)
+# a.get_head().adopt(e)
+# a.make_head_tail()
+# print(a.order_list())
+# a.gui_convert()
 # import pygame as pg
 
 # a = Node("a")

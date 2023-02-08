@@ -186,14 +186,19 @@ class Node:
         return cataloged
 
     def get_head(self) -> Node:
+        # head = []
+        # if self.data == "head":
+        #     head.append(self)
+        # for parent in self.parents:
+        #     if parent.data == "head":
+        #         return parent
+        #     if parent != self:
+        #         head.append(parent.get_head())
         head = []
-        if self.data == "head":
-            head.append(self)
-        for parent in self.parents:
-            if parent.data == "head":
-                return parent
-            if parent != self:
-                head.append(parent.get_head())
+        for node in self.get_all():
+            if node.data == "head":
+                head.append(node)
+
         if len(head) == 1:
             return head[0]
         if len(head) == 0:
@@ -204,13 +209,17 @@ class Node:
         # return self.get_head()
 
     def get_tail(self) -> Node:
+        # if self.data == "tail":
+        #     tail.append(self)
+        # for child in self.children:
+        #     if child.data == "tail":
+        #         return child
+        #     tail.append(child.get_tail())
         tail = []
-        if self.data == "tail":
-            tail.append(self)
-        for child in self.children:
-            if child.data == "tail":
-                return child
-            tail.append(child.get_tail())
+        for node in self.get_all():
+            if node.data == "head":
+                tail.append(node)
+
         if len(tail) == 1:
             return tail[0]
         if len(tail) == 0:
@@ -485,26 +494,33 @@ class Node:
         def children_in_front(node: Node) -> set[Node]:
             return node.children & set(in_front(node))
 
-        def parents_behind(node: Node) -> set[Node]:
-            return node.parents & set(behind(node))
-
-        def e_cn(node: Node) -> set[Node]:
+        def eventually_connect(node: Node) -> set[Node]:
             """
             all nodes that current node eventually leeds to
             """
             out = children_in_front(node)
             for child in out.copy():
-                out |= e_cn(child)
+                out |= eventually_connect(child)
 
             return out
 
-        # <editor-fold desc="separated parts">
-        def get_last_node(children) -> tuple[Node, int]:
-            shared_forward_nodes = set.intersection(*[e_cn(child) for child in children])
+        def eventually_connect_to(node: Node) -> set[Node]:
+            out = parents_behind(node)
+            for parent in out.copy():
+                out |= eventually_connect_to(parent)
+
+            return out
+
+        def parents_behind(node: Node) -> set[Node]:
+            return node.parents & set(behind(node))
+
+        def get_last_node(children) -> tuple[Node, bool]:
+            improper_bounding_box = False  # flag
+            shared_forward_nodes = set.intersection(*[eventually_connect(child) | {child} for child in children])
 
             # add all children in "f_ch" that are before the first "shared_forward_nodes" to
             # "nodes_to_iterate"
-            for part in enumerate(sectioned_list):
+            for part in sectioned_list:
                 # break when it finds the first "shared_forward_nodes"
                 if any(x in shared_forward_nodes for x in part):
                     # get the last_node
@@ -516,77 +532,107 @@ class Node:
                               f"{[x.data for x in last_node]}"
 
                     last_node = last_node.pop()
+                    
+                    # check if it's an "improper_bounding_box"
+                    if len(set.intersection(*[children_in_front(parent) for parent in parents_behind(last_node)])) > 1:
+                        improper_bounding_box = True
+                        continue
+                        # continue until you actually find a "proper_box"
 
-
-                    return last_node
-        # </editor-fold>
+                    return last_node, improper_bounding_box
 
         # name is fucking misleading
         def iterate_to(start: Node, end: Node):
             behind_end = parents_behind(end)
             node_iter = start
+            part_struct = []
+
+            while True:
+                next_node, sub_part_struct = next_box(node_iter)
+                part_struct += sub_part_struct
+
+                if next_node in behind_end:  # not checking if it's in front
+                    return part_struct
+                else:
+                    node_iter = next_node
+
+        def restrictive_iterate_to(start: Node, end: Node, allowed: set[Node]):
+            behind_end = parents_behind(end)
+            node_iter = start
             part_struct = [start]
 
             while True:
-                next_node, sub_part_struct = step_forward(node_iter)
+                next_node, sub_part_struct = next_box(node_iter)
                 part_struct += sub_part_struct
 
-                if len(next_node) == 1:
-                    next_node = next(iter(next_node))
-                    if next_node in behind_end:  # not checking if it's in front
-                        return part_struct
-                    else:
-                        node_iter = next_node
+                if next_node in behind_end:  # not checking if it's in front
+                    return part_struct
+                else:
+                    node_iter = next_node
 
-        def step_forward(node: Node, struct_part=None) -> tuple[set[Node], list[Node | list]]:  # , structure):
+        def handle_improper_bounding_box(first_node: Node, last_node: Node):
+            struct_part = []
+            to_be_cataloged = eventually_connect(first_node) & set(sum(sectioned_list[:section_index(last_node)], []))
+            for part in sectioned_list[section_index(first_node):section_index(last_node)]:
+                struct_part += part
+                # sub_part = []
+                # for node in to_be_cataloged & set(part):
+                #     f_ch = children_in_front(node)
+                #     last_node, improper_bounding_box = get_last_node(f_ch)
+                #
+                #     if improper_bounding_box:
+                #         continue
+            return {last_node}, struct_part
+
+            # to be cataloged
+
+        def handle_proper_bounding_box(first_node: Node, last_node: Node):
+            struct_part = []
+            cataloged_last_nodes = set()
+
+            step_forward = children_in_front(first_node)
+            nodes_before_last = set(behind(last_node))
+            
+            # iterate all sub-parts inside box
+            for child in set(step_forward) - nodes_before_last:
+                sub_nodes_before_last, sub_struct_part = iterate_to(child, last_node)
+                struct_part += sub_struct_part
+                cataloged_last_nodes.add(sub_nodes_before_last)
+
+            struct_part.append(cataloged_last_nodes)
+            # if all last_nodes are cataloged, complete the box. 
+            if len(parents_behind(last_node)) == len(cataloged_last_nodes):
+                struct_part.append(last_node)
+                
+                # return finished box
+                return {last_node}, struct_part
+            
+            # return incomplete box 
+            return set(cataloged_last_nodes), struct_part
+
+        def next_box(node: Node, struct_part=None) -> tuple[Node, list[Node | list]]:  # , structure):
             if struct_part is None:
                 struct_part = []
 
             f_ch = children_in_front(node)
 
+            if len(f_ch) == 0:
+                raise "wut (kys)"
             if len(f_ch) == 1:
-                return f_ch, [node]
+                return f_ch.pop(), struct_part + [node]
 
-            last_node, last_index = get_last_node(f_ch)
-            nodes_before_last = set(behind(last_node))
+            last_node, improper_bounding_box = get_last_node(f_ch)
 
-            nodes_connected_to_last = []
-            stepped_forward = f_ch.copy()
+            if improper_bounding_box:
+                nodes_connected_to_last, struct_part = handle_improper_bounding_box(node, last_node)
+            else:
+                nodes_connected_to_last, struct_part = handle_proper_bounding_box(node, last_node)
 
-            for child in set(stepped_forward) & nodes_before_last:
-                sub_nodes_before_last, sub_struct_part = iterate_to(child, last_node)
-                struct_part += sub_struct_part
-                nodes_before_last.add(sub_nodes_before_last)
-
-            # while True:
-            #     nodes_to_iterate = set(stepped_forward) & nodes_before_last  # nodes to step forward later
-            #
-            #     if not len(nodes_to_iterate):
-            #         break
-            #
-            #     stepped_forward = []
-            #     for child in nodes_to_iterate:
-            #         next_nodes, sub_part_struct = step_forward(child)
-            #
-            #         if child in parents_behind(last_node) or \
-            #                 len(next_nodes) > 1:
-            #             nodes_connected_to_last += next_nodes
-            #             continue
-            #
-            #         stepped_forward += next_nodes
-
-            # if we have all f_connections to last_node
-
-            struct_part.append(nodes_connected_to_last)
-            if len(parents_behind(last_node)) == len(nodes_connected_to_last):
-                struct_part.append(last_node)
-
-                return {last_node}, struct_part
-            return set(nodes_connected_to_last), struct_part
+            return nodes_connected_to_last.pop(), struct_part
 
         sectioned_list = self.sectioned_list_word_combine()
-
-        return iterate_to(self.get_head(), self.get_tail()) + [self.get_tail()]
+        tail = self.get_tail()
+        return iterate_to(self.get_head(), tail) + [tail]
 
     def order_list(self: Node):
         things_left: list[list[Node]] = self.sectioned_list_word_combine()
@@ -735,7 +781,6 @@ class Node:
                 #           (cx, cy + text_height // 2)))
 
         img.show()
-    # </editor-fold>
+    # </editor-fold>?
 
 # todo rename "thing" to "node"
-# todo add typehints
