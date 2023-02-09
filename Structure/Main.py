@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Iterable
+
 from PIL import Image, ImageFont, ImageDraw
 
 from Bezier import connect
@@ -226,11 +228,15 @@ class Node:
             raise TypeError("0 tails found")
         raise TypeError("multiple tails found")
 
-    def nodes_to(self) -> set[Node]:
+    def weak_connections(self) -> set[Node]:
+        """
+        all nodes that eventually connects to node without any intermediate text-nodes
+        :return:
+        """
         connections = set()
         for parent in self.parents:
             if parent.data == "point":
-                connections |= parent.nodes_to()
+                connections |= parent.weak_connections()
             else:
                 connections.add(parent)
         return connections
@@ -324,11 +330,12 @@ class Node:
             if len(node.children) < 2:
                 continue
 
-            possible = []
+            # all children of
+            possible: list[tuple[Node, set[node]]] = []
             for child in node.children:
-                temp = child.nodes_to()
-                if len(temp) >= 2:
-                    possible.append((child, temp))
+                weak_connections = child.weak_connections()
+                if len(weak_connections) >= 2:
+                    possible.append((child, weak_connections))
 
             if len(possible) > 0:
                 temp = recursion()
@@ -377,48 +384,6 @@ class Node:
     # </editor-fold>
 
     # <editor-fold desc="display functions">
-    def sectioned_list_word_combine(self: Node):
-        def push_forward(node):
-            for x in layers:
-                try:
-                    x.remove(node)
-                except ValueError:
-                    pass
-                else:
-                    things.remove(node)
-
-        def word_extend(node):
-            if len(node.children) == 1:
-                one_child = next(iter(node.children))
-                if len(one_child.parents) == 1 and len(one_child.data) == 1:
-                    return [node] + word_extend(one_child)
-            return [node]
-
-        ignore_push = set()  # don't push anything from ignore
-        things = []
-        layers = []
-        queue = [self.get_head()]
-
-        while len(queue) > 0:
-            next_queue = set()
-            layers.append(queue)
-            things += queue
-
-            for thing in queue:
-                if things.count(thing) == 1:  # same as "< 2"
-                    children = set(x for x in thing.children if x != thing) - ignore_push
-                    for child in children:
-                        if child not in ignore_push:
-                            push_forward(child)
-                            temp = set(word_extend(child))
-                            next_queue |= temp
-                            temp.remove(child)
-                            ignore_push |= temp
-
-            queue = list(next_queue)
-
-        return layers
-
     def sectioned_list(self: Node):
         def remove_from_layers(node):
             for x in layers:
@@ -449,27 +414,6 @@ class Node:
             queue = list(next_queue)
 
         return layers
-
-    def f_ch(self, sectioned_list):
-        # todo might optimize (very inefficient)
-        for i, part in enumerate(sectioned_list):
-            if self in part:
-                out = []
-                for f_part in sectioned_list:
-                    out += f_part
-                return out
-
-    # def section_groups(self: Node):
-    #     sectioned_list = self.sectioned_list()
-    #     f_ch = self.f_ch(sectioned_list)
-    #     if len(f_ch) == 1:
-
-    def section_groups(self: Node):
-        sectioned_list = self.sectioned_list_word_combine()
-        queue = [self.get_head()]
-
-        while len(queue) > 0:
-            cur = queue[-1]
 
     def box_convert(self: Node):
         def section_index(node: Node) -> int:
@@ -542,38 +486,37 @@ class Node:
                     return last_node, improper_bounding_box
 
         # name is fucking misleading
-        def iterate_to(start: Node, end: Node) -> tuple[Node, list]:
-            behind_end = parents_behind(end)
+        def iterate_to(start: Node, end: Node) -> tuple[Node, StructureType]:
             node_iter = start
-            part_struct = []
+            part_struct: StructureType = [start]
 
             while True:
-                next_node, sub_part_struct = next_box(node_iter)
-                part_struct += sub_part_struct
+                next_node, sub_part_struct = next_step(node_iter)
 
                 # if next_node == behind_end:  # not checking if it's in front
                 if next_node == end:  # not checking if it's in front
                     return node_iter, part_struct
                 else:
+                    part_struct += sub_part_struct
                     node_iter = next_node
 
-        def restrictive_iterate_to(start: Node, end: Node, allowed: set[Node]):
-            behind_end = parents_behind(end)
-            node_iter = start
-            part_struct = [start]
-
-            while True:
-                next_node, sub_part_struct = next_box(node_iter)
-                part_struct += sub_part_struct
-
-                if next_node in behind_end:  # not checking if it's in front
-                    return part_struct
-                else:
-                    node_iter = next_node
+        # def restrictive_iterate_to(start: Node, end: Node, allowed: set[Node]):
+        #     behind_end = parents_behind(end)
+        #     node_iter = start
+        #     part_struct = [start]
+        #
+        #     while True:
+        #         next_node, sub_part_struct = next_step(node_iter)
+        #         part_struct += sub_part_struct
+        #
+        #         if next_node in behind_end:  # not checking if it's in front
+        #             return part_struct
+        #         else:
+        #             node_iter = next_node
 
         def handle_improper_bounding_box(first_node: Node, last_node: Node):
             struct_part = []
-            to_be_cataloged = eventually_connect(first_node) & set(sum(sectioned_list[:section_index(last_node)], []))
+            # to_be_cataloged = eventually_connect(first_node) & set(sum(sectioned_list[:section_index(last_node)], []))
             for part in sectioned_list[section_index(first_node):section_index(last_node)]:
                 struct_part += part
                 # sub_part = []
@@ -588,19 +531,18 @@ class Node:
             # to be cataloged
 
         def handle_proper_bounding_box(first_node: Node, last_node: Node):
-            struct_part = []
+            struct_part: StructureType = []
             cataloged_last_nodes = set()
 
             step_forward = children_in_front(first_node)
-            nodes_before_last = parents_behind(last_node)
-            
+
             # iterate all sub-parts inside box
             for child in set(step_forward):
                 sub_nodes_before_last, sub_struct_part = iterate_to(child, last_node)
                 struct_part.append(sub_struct_part)
                 cataloged_last_nodes.add(sub_nodes_before_last)
 
-            struct_part = [first_node, tuple(struct_part)]
+            struct_part = [tuple(struct_part)]
             # struct_part.append(cataloged_last_nodes)
             # if all last_nodes are cataloged, complete the box.
             if len(parents_behind(last_node)) == len(cataloged_last_nodes):
@@ -610,13 +552,23 @@ class Node:
             # return incomplete box 
             return set(cataloged_last_nodes), struct_part
 
-        def next_box(node: Node) -> tuple[Node, list[Node | list]]:
+        def next_step(node: Node) -> tuple[Node, StructureType]:
+            """
+            computes the next step after node
+            next_step(a) => d, [(b, c), d]
+                a - b - d
+                  - c -
+            next_step(a) => b, [b]
+                a - b - d
+            """
+
             f_ch = children_in_front(node)
 
             if len(f_ch) == 0:
                 raise "wut (kys)"
             if len(f_ch) == 1:
-                return f_ch.pop(), [node]
+                out = f_ch.pop()
+                return out, [out]
 
             last_node, improper_bounding_box = get_last_node(f_ch)
 
@@ -629,8 +581,9 @@ class Node:
 
         sectioned_list = self.sectioned_list_word_combine()
         tail = self.get_tail()
-        return iterate_to(self.get_head(), tail) + (tail,)
+        return iterate_to(self.get_head(), tail)[1] + [tail]
 
+    # <editor-fold desc="useless">
     def order_list(self: Node):
         things_left: list[list[Node]] = self.sectioned_list_word_combine()
         path: list[Node] = [self.get_head()]
@@ -682,6 +635,50 @@ class Node:
             path.pop(-1)
 
         return ordered
+    # </editor-fold>
+
+    # <editor-fold desc="reference implementation">
+    def sectioned_list_word_combine(self: Node):
+        def push_forward(node):
+            for x in layers:
+                try:
+                    x.remove(node)
+                except ValueError:
+                    pass
+                else:
+                    things.remove(node)
+
+        def word_extend(node):
+            if len(node.children) == 1:
+                one_child = next(iter(node.children))
+                if len(one_child.parents) == 1 and len(one_child.data) == 1:
+                    return [node] + word_extend(one_child)
+            return [node]
+
+        ignore_push = set()  # don't push anything from ignore
+        things = []
+        layers = []
+        queue = [self.get_head()]
+
+        while len(queue) > 0:
+            next_queue = set()
+            layers.append(queue)
+            things += queue
+
+            for thing in queue:
+                if things.count(thing) == 1:  # same as "< 2"
+                    children = set(x for x in thing.children if x != thing) - ignore_push
+                    for child in children:
+                        if child not in ignore_push:
+                            push_forward(child)
+                            temp = set(word_extend(child))
+                            next_queue |= temp
+                            temp.remove(child)
+                            ignore_push |= temp
+
+            queue = list(next_queue)
+
+        return layers
 
     def display_nodes(self: Node):
         # might need to check if node.word_exclusive_child is in column
@@ -706,7 +703,6 @@ class Node:
         return font.getbbox(
             self.convert_nodes_text(self.display_nodes())
         )[2]
-
 
     def gui_convert(self: Node, text_size=100):
         # ordered_list = structure.order_list()
@@ -778,6 +774,11 @@ class Node:
                 #           (cx, cy + text_height // 2)))
 
         img.show()
-    # </editor-fold>?
+    # </editor-fold>
 
-# todo rename "thing" to "node"
+    # </editor-fold>
+
+
+# typehint for structure
+StructurePartType = Iterable['structure_type'] | Node
+StructureType = tuple[StructurePartType] | list[StructurePartType]
