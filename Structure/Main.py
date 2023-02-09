@@ -217,7 +217,7 @@ class Node:
         #     tail.append(child.get_tail())
         tail = []
         for node in self.get_all():
-            if node.data == "head":
+            if node.data == "tail":
                 tail.append(node)
 
         if len(tail) == 1:
@@ -542,7 +542,7 @@ class Node:
                     return last_node, improper_bounding_box
 
         # name is fucking misleading
-        def iterate_to(start: Node, end: Node):
+        def iterate_to(start: Node, end: Node) -> tuple[Node, list]:
             behind_end = parents_behind(end)
             node_iter = start
             part_struct = []
@@ -551,8 +551,9 @@ class Node:
                 next_node, sub_part_struct = next_box(node_iter)
                 part_struct += sub_part_struct
 
-                if next_node in behind_end:  # not checking if it's in front
-                    return part_struct
+                # if next_node == behind_end:  # not checking if it's in front
+                if next_node == end:  # not checking if it's in front
+                    return node_iter, part_struct
                 else:
                     node_iter = next_node
 
@@ -591,35 +592,31 @@ class Node:
             cataloged_last_nodes = set()
 
             step_forward = children_in_front(first_node)
-            nodes_before_last = set(behind(last_node))
+            nodes_before_last = parents_behind(last_node)
             
             # iterate all sub-parts inside box
-            for child in set(step_forward) - nodes_before_last:
+            for child in set(step_forward):
                 sub_nodes_before_last, sub_struct_part = iterate_to(child, last_node)
-                struct_part += sub_struct_part
+                struct_part.append(sub_struct_part)
                 cataloged_last_nodes.add(sub_nodes_before_last)
 
-            struct_part.append(cataloged_last_nodes)
-            # if all last_nodes are cataloged, complete the box. 
+            struct_part = [first_node, tuple(struct_part)]
+            # struct_part.append(cataloged_last_nodes)
+            # if all last_nodes are cataloged, complete the box.
             if len(parents_behind(last_node)) == len(cataloged_last_nodes):
-                struct_part.append(last_node)
-                
                 # return finished box
-                return {last_node}, struct_part
+                return {last_node}, struct_part + [last_node]
             
             # return incomplete box 
             return set(cataloged_last_nodes), struct_part
 
-        def next_box(node: Node, struct_part=None) -> tuple[Node, list[Node | list]]:  # , structure):
-            if struct_part is None:
-                struct_part = []
-
+        def next_box(node: Node) -> tuple[Node, list[Node | list]]:
             f_ch = children_in_front(node)
 
             if len(f_ch) == 0:
                 raise "wut (kys)"
             if len(f_ch) == 1:
-                return f_ch.pop(), struct_part + [node]
+                return f_ch.pop(), [node]
 
             last_node, improper_bounding_box = get_last_node(f_ch)
 
@@ -632,7 +629,7 @@ class Node:
 
         sectioned_list = self.sectioned_list_word_combine()
         tail = self.get_tail()
-        return iterate_to(self.get_head(), tail) + [tail]
+        return iterate_to(self.get_head(), tail) + (tail,)
 
     def order_list(self: Node):
         things_left: list[list[Node]] = self.sectioned_list_word_combine()
