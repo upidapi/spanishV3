@@ -415,7 +415,7 @@ class Node:
 
         return layers
 
-    def box_convert(self: Node):
+    def box_convert(self: Node) -> StructureType:
         def section_index(node: Node) -> int:
             for i, part in enumerate(sectioned_list):
                 if node in part:
@@ -582,6 +582,96 @@ class Node:
         sectioned_list = self.sectioned_list_word_combine()
         tail = self.get_tail()
         return iterate_to(self.get_head(), tail)[1] + [tail]
+
+    def structure_image(self: Node, text_size=100):
+        def compute_part(part_struct, size=None) -> Image:
+            if isinstance(part_struct, Node):
+                pass
+                # return image of node_text
+            if isinstance(part_struct, list):
+
+                # should make nodes into words
+                min_width = 0
+                image_parts = []
+                for part in part_struct:
+                    img_part = compute_part(part)
+                    image_parts.append(img_part)
+
+                    min_width += img_part.width
+
+                min_height = min(image_parts, key=lambda x: x.height)
+
+
+
+            if isinstance(part_struct, tuple):
+                pass
+
+        structure = self.box_convert()
+
+        font = ImageFont.truetype('arial.ttf', text_size)
+        _, _, x_margin, text_height = font.getbbox("ooo")
+        y_margin = text_height // 2
+
+
+        text_x = []
+        for col in ordered_list:
+            max_x = 0
+            for node in col:
+                max_x = max(node.get_width(), max_x)
+            text_x.append(max_x)
+
+        text_y = [text_height * len(col) for col in ordered_list]
+        # print(text_x, text_y)
+
+        img = Image.new("RGBA", (
+            sum(text_x) + x_margin * (len(text_x) - 1),
+            max(text_y) + y_margin * (len(text_y) - 1)))
+        draw = ImageDraw.Draw(img)
+
+        text_pos = {}
+        for i, col in enumerate(ordered_list):
+            x_pos = sum(text_x[:i]) + i * x_margin
+
+            for j, row in enumerate(col):
+                y_pos = j * (text_height + y_margin)
+                width = row.get_width()
+
+                text_pos[row] = x_pos, y_pos, width, col
+
+        text_pos_left = text_pos.copy()
+        while len(text_pos_left) > 0:
+            # img.show()
+            node = next(iter(text_pos_left.keys()))
+            x, y, w, col = text_pos[node]
+            del text_pos_left[node]
+
+            if len(node.data) == 1:
+                nodes_displayed = node.display_nodes()
+                for rm_node in nodes_displayed:
+                    text_pos_left.pop(rm_node, None)
+                draw.text((x, y), node.convert_nodes_text(nodes_displayed), fill=(0, 0, 0), font=font)
+                w = node.get_width()
+                node = nodes_displayed[-1]
+
+            if node.data == "head":
+                for child in node.children:
+                    cx, cy, cw, _ = text_pos[child]
+                    draw.line(((0, cy + text_height // 2),
+                               (cx, cy + text_height // 2)))
+                continue
+            for child in node.children:
+                cx, cy, cw, _ = text_pos[child]
+                if child.data == "tail":
+                    draw.line(((x + w, y + text_height // 2),
+                               (cx + cw + 10, y + text_height // 2)))
+
+                    continue
+                draw.line(connect((x + w, y + text_height // 2),
+                                  (cx, cy + text_height // 2)))
+                # draw.line(((x + w, y + text_height // 2),
+                #           (cx, cy + text_height // 2)))
+
+        img.show()
 
     # <editor-fold desc="useless">
     def order_list(self: Node):
