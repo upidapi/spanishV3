@@ -584,93 +584,115 @@ class Node:
         return iterate_to(self.get_head(), tail)[1] + [tail]
 
     def structure_image(self: Node, text_size=100):
-        def compute_part(part_struct, size=None) -> Image:
-            if isinstance(part_struct, Node):
-                pass
-                # return image of node_text
-            if isinstance(part_struct, list):
+        def get_width(image):
+            return image.size[0]
 
-                # should make nodes into words
-                min_width = 0
+        def get_height(image):
+            return image.size[1]
+
+        def compute_part(part_struct) -> Image:
+            if isinstance(part_struct, Node):
+                if len(part_struct.data) > 1:
+                    text = ""
+                else:
+                    text = part_struct.data
+
+                _, _, width, height = font.getbbox(text)
+                sub_image = Image.new("RGBA", (width, height))
+                draw = ImageDraw.Draw(sub_image)
+                draw.rectangle((0, 0) + sub_image.size, fill=(255, 100, 255))
+                draw.text((0, 0), text, fill=(0, 0, 0), font=font)
+
+                return sub_image
+
+            if isinstance(part_struct, list):
+                total_width = 0
+                max_height = 0
                 image_parts = []
+
                 for part in part_struct:
                     img_part = compute_part(part)
                     image_parts.append(img_part)
 
-                    min_width += img_part.width
+                    total_width += get_width(img_part)
+                    max_height = max(max_height, get_height(img_part))
 
-                min_height = min(image_parts, key=lambda x: x.height)
+                total_width += x_margin * (len(image_parts) - 1)
 
+                sub_image = Image.new("RGBA", (total_width, max_height))
+                draw = ImageDraw.Draw(sub_image)
+                draw.rectangle((0, 0) + sub_image.size, fill=(100, 0, 0))
 
+                # add all image_parts
+                cur_tot_width = 0
+                for part in image_parts:
+                    pos = (cur_tot_width, (max_height - get_height(part)) // 2)
+
+                    sub_image.paste(part, pos)
+
+                    cur_tot_width += get_width(part) + x_margin
+
+                # connect image_parts
+                mid_pos = max_height // 2
+                cur_tot_width = get_width(image_parts[0])
+                for part in image_parts[1:]:
+                    draw.line(((cur_tot_width, mid_pos), (cur_tot_width + x_margin, mid_pos)))
+                    cur_tot_width += get_width(part) + x_margin
+
+                return sub_image
 
             if isinstance(part_struct, tuple):
-                pass
+                total_height = 0
+                max_width = 0
+                image_parts = []
+
+                for part in part_struct:
+                    img_part = compute_part(part)
+                    image_parts.append(img_part)
+
+                    total_height += get_height(img_part)
+                    max_width = max(max_width, get_width(img_part))
+
+                total_height += y_margin * (len(image_parts) - 1)
+                max_width += x_margin * 2
+
+                sub_image = Image.new("RGBA", (max_width, total_height))
+                draw = ImageDraw.Draw(sub_image)
+                draw.rectangle((0, 0) + sub_image.size, fill=(0, 0, 0))
+
+                # add all image_parts
+                cur_tot_height = 0
+                start_pos = 0, total_height // 2
+                end_pos = max_width, total_height // 2
+                for part in image_parts:
+                    x_pos = (max_width - get_width(part)) // 2
+                    y_mid_pos = cur_tot_height + get_height(part) // 2
+
+                    # draw image_part
+                    sub_image.paste(part, (x_pos, cur_tot_height))
+
+                    # connect image_part
+                    draw.line(connect(
+                        start_pos,
+                        (x_pos, y_mid_pos)
+                    ))
+
+                    draw.line(connect(
+                        (x_pos + part.width, y_mid_pos),
+                        end_pos
+                    ))
+
+                    cur_tot_height += get_height(part) + y_margin
+
+                return sub_image
 
         structure = self.box_convert()
 
         font = ImageFont.truetype('arial.ttf', text_size)
         _, _, x_margin, text_height = font.getbbox("ooo")
-        y_margin = text_height // 2
+        y_margin = text_height // 4
 
-
-        text_x = []
-        for col in ordered_list:
-            max_x = 0
-            for node in col:
-                max_x = max(node.get_width(), max_x)
-            text_x.append(max_x)
-
-        text_y = [text_height * len(col) for col in ordered_list]
-        # print(text_x, text_y)
-
-        img = Image.new("RGBA", (
-            sum(text_x) + x_margin * (len(text_x) - 1),
-            max(text_y) + y_margin * (len(text_y) - 1)))
-        draw = ImageDraw.Draw(img)
-
-        text_pos = {}
-        for i, col in enumerate(ordered_list):
-            x_pos = sum(text_x[:i]) + i * x_margin
-
-            for j, row in enumerate(col):
-                y_pos = j * (text_height + y_margin)
-                width = row.get_width()
-
-                text_pos[row] = x_pos, y_pos, width, col
-
-        text_pos_left = text_pos.copy()
-        while len(text_pos_left) > 0:
-            # img.show()
-            node = next(iter(text_pos_left.keys()))
-            x, y, w, col = text_pos[node]
-            del text_pos_left[node]
-
-            if len(node.data) == 1:
-                nodes_displayed = node.display_nodes()
-                for rm_node in nodes_displayed:
-                    text_pos_left.pop(rm_node, None)
-                draw.text((x, y), node.convert_nodes_text(nodes_displayed), fill=(0, 0, 0), font=font)
-                w = node.get_width()
-                node = nodes_displayed[-1]
-
-            if node.data == "head":
-                for child in node.children:
-                    cx, cy, cw, _ = text_pos[child]
-                    draw.line(((0, cy + text_height // 2),
-                               (cx, cy + text_height // 2)))
-                continue
-            for child in node.children:
-                cx, cy, cw, _ = text_pos[child]
-                if child.data == "tail":
-                    draw.line(((x + w, y + text_height // 2),
-                               (cx + cw + 10, y + text_height // 2)))
-
-                    continue
-                draw.line(connect((x + w, y + text_height // 2),
-                                  (cx, cy + text_height // 2)))
-                # draw.line(((x + w, y + text_height // 2),
-                #           (cx, cy + text_height // 2)))
-
+        img = compute_part(structure)
         img.show()
 
     # <editor-fold desc="useless">
