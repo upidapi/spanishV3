@@ -9,13 +9,6 @@ from Constructor import convert
 # b = Node("b")
 # c = Node("c")
 # d = Node("d")
-#
-# a.adopt(b)
-# b.adopt(d)
-# c.parallelize(b)
-# a.make_head_tail()
-# a.structure_image()
-
 
 # a.get_head().adopt(b)
 # a.make_head_tail()
@@ -35,28 +28,43 @@ d = Node("d")
 e = Node("e")
 f = Node("f")
 
-# a.adopt(d)
-# a.adopt(e)
-#
+# a.adopt(b)
 # b.adopt(d)
-# b.adopt(e)
-# b.adopt(f)
-#
-# c.adopt(e)
-# c.adopt(f)
-#
+# c.parallelize(b)
 # a.make_head_tail()
-# print(1, a.sectioned_list())
-# a.point_simplify()
-# print(1, a.sectioned_list())
+
+# a.adopt(b)
+# b.adopt(c)
+# b.adopt(e)
+#
+# c.adopt(d)
+#
+# e.adopt(f)
+# d.adopt(f)
+# a.sync()
+
+# a.structure_image(100)
 
 a.adopt(d)
 a.adopt(e)
-a.sync()
-a.get_head().adopt(c)
-b.parallelize(a)
+
+b.adopt(d)
+b.adopt(e)
+b.adopt(f)
+
+c.adopt(e)
+c.adopt(f)
+
 a.sync()
 a.structure_image()
+
+# a.adopt(d)
+# a.adopt(e)
+# a.sync()
+# a.get_head().adopt(c)
+# b.parallelize(a)
+# a.sync()
+
 # print(a.sectioned_list())
 # print(a.order_list())
 

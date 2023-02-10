@@ -471,9 +471,9 @@ class Node:
                     last_node = shared_forward_nodes & set(part)
 
                     if len(last_node) > 1:
-                        raise f"there should be a point from " \
-                              f"{[x.data for x in shared_forward_nodes]} to" \
-                              f"{[x.data for x in last_node]}"
+                        raise TypeError(f"there should be a point from "
+                                        f"{[x.data for x in shared_forward_nodes]} to"
+                                        f"{[x.data for x in last_node]}")
 
                     last_node = last_node.pop()
                     
@@ -565,7 +565,7 @@ class Node:
             f_ch = children_in_front(node)
 
             if len(f_ch) == 0:
-                raise "wut (kys)"
+                raise TypeError("wut (kys)")
             if len(f_ch) == 1:
                 out = f_ch.pop()
                 return out, [out]
@@ -591,6 +591,21 @@ class Node:
             return image.size[1]
 
         def compute_part(part_struct) -> Image:
+            def should_draw_line(j):
+                if isinstance(part_struct[j], tuple):
+                    return False
+
+                if j < len(part_struct) - 1:
+
+                    if isinstance(part_struct[j], Node) and \
+                            isinstance(part_struct[j + 1], Node):
+                        return False
+
+                    if isinstance(part_struct[j + 1], tuple):
+                        return False
+
+                return True
+
             if isinstance(part_struct, Node):
                 if len(part_struct.data) > 1:
                     text = ""
@@ -600,44 +615,55 @@ class Node:
                 _, _, width, height = font.getbbox(text)
                 sub_image = Image.new("RGBA", (width, height))
                 draw = ImageDraw.Draw(sub_image)
-                draw.rectangle((0, 0) + sub_image.size, fill=(255, 100, 255))
+                # draw.rectangle((0, 0) + sub_image.size, fill=(255, 100, 255))
                 draw.text((0, 0), text, fill=(0, 0, 0), font=font)
 
                 return sub_image
 
             if isinstance(part_struct, list):
-                total_width = 0
+                total_width = - x_margin  # remove first connection
                 max_height = 0
                 image_parts = []
 
-                for part in part_struct:
+                for i, part in enumerate(part_struct):
                     img_part = compute_part(part)
                     image_parts.append(img_part)
 
                     total_width += get_width(img_part)
-                    max_height = max(max_height, get_height(img_part))
 
-                total_width += x_margin * (len(image_parts) - 1)
+                    if should_draw_line(i):
+                        total_width += x_margin
+
+                    max_height = max(max_height, get_height(img_part))
 
                 sub_image = Image.new("RGBA", (total_width, max_height))
                 draw = ImageDraw.Draw(sub_image)
-                draw.rectangle((0, 0) + sub_image.size, fill=(100, 0, 0))
+                # draw.rectangle((0, 0) + sub_image.size, fill=(100, 0, 0))
 
                 # add all image_parts
                 cur_tot_width = 0
-                for part in image_parts:
+                for i, part in enumerate(image_parts):
                     pos = (cur_tot_width, (max_height - get_height(part)) // 2)
 
                     sub_image.paste(part, pos)
 
-                    cur_tot_width += get_width(part) + x_margin
+                    cur_tot_width += get_width(part)
+
+                    if should_draw_line(i):
+                        cur_tot_width += x_margin
 
                 # connect image_parts
                 mid_pos = max_height // 2
-                cur_tot_width = get_width(image_parts[0])
-                for part in image_parts[1:]:
-                    draw.line(((cur_tot_width, mid_pos), (cur_tot_width + x_margin, mid_pos)))
-                    cur_tot_width += get_width(part) + x_margin
+                cur_tot_width = 0
+                for i, part in enumerate(image_parts):
+                    cur_tot_width += get_width(part)
+
+                    if i == 0:
+                        continue
+
+                    if should_draw_line(i):
+                        cur_tot_width += x_margin
+                        draw.line(((cur_tot_width, mid_pos), (cur_tot_width + x_margin, mid_pos)))
 
                 return sub_image
 
@@ -658,7 +684,7 @@ class Node:
 
                 sub_image = Image.new("RGBA", (max_width, total_height))
                 draw = ImageDraw.Draw(sub_image)
-                draw.rectangle((0, 0) + sub_image.size, fill=(0, 0, 0))
+                # draw.rectangle((0, 0) + sub_image.size, fill=(0, 0, 0))
 
                 # add all image_parts
                 cur_tot_height = 0
@@ -674,12 +700,23 @@ class Node:
                     # connect image_part
                     draw.line(connect(
                         start_pos,
-                        (x_pos, y_mid_pos)
+                        (x_margin, y_mid_pos)
                     ))
 
                     draw.line(connect(
-                        (x_pos + part.width, y_mid_pos),
+                        (max_width - x_margin, y_mid_pos),
                         end_pos
+                    ))
+
+                    # line connect
+                    draw.line((
+                        (x_margin, y_mid_pos),
+                        (x_pos, y_mid_pos)
+                    ))
+
+                    draw.line((
+                        (x_pos + part.width, y_mid_pos),
+                        (max_width - x_margin, y_mid_pos)
                     ))
 
                     cur_tot_height += get_height(part) + y_margin
@@ -691,6 +728,7 @@ class Node:
         font = ImageFont.truetype('arial.ttf', text_size)
         _, _, x_margin, text_height = font.getbbox("ooo")
         y_margin = text_height // 4
+        x_margin = x_margin // 2
 
         img = compute_part(structure)
         img.show()
