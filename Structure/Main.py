@@ -337,46 +337,48 @@ class Node:
                 if len(weak_connections) >= 2:
                     possible.append((child, weak_connections))
 
-            if len(possible) > 0:
-                temp = recursion()
+            if len(possible) == 0:
+                continue
 
-                connection_options = []
-                possible_connection_options = []
+            temp = recursion()
 
-                for thing in temp:
-                    children, parents = thing
+            connection_options = []
+            possible_connection_options = []
 
-                    if len(children) >= 2 and parents is not None:
-                        possible_connection_options.append((set(thing[0]), parents))
+            for thing in temp:
+                children, parents = thing
 
-                while len(possible_connection_options) > 0:
+                if len(children) >= 2 and parents is not None:
+                    possible_connection_options.append((set(thing[0]), parents))
 
-                    for i, option in enumerate(possible_connection_options):
-                        direct_parents = []
-                        children, parents = option
+            while len(possible_connection_options) > 0:
 
-                        for child in children:
-                            direct_parents += child.parents & parents
-
-                        if len(direct_parents) >= max(len(parents), len(children)):
-                            connection_options.append((i, direct_parents, children, parents))
-
-                    if len(connection_options) == 0:
-                        break
-
-                    i, _, children, parents = \
-                        max(connection_options, key=lambda x: len(x[1]))
-                    possible_connection_options.pop(i)
+                for i, option in enumerate(possible_connection_options):
+                    direct_parents = []
+                    children, parents = option
 
                     for child in children:
-                        for parent in child.parents & parents:
-                            parent.remove_connection(child)
+                        direct_parents += child.parents & parents
 
-                    connection_point = Node("point")
-                    for parent in parents:
-                        parent.adopt(connection_point)
-                    for child in children:
-                        child.r_adopt(connection_point)
+                    if len(direct_parents) >= max(len(parents), len(children)):
+                        connection_options.append((i, direct_parents, children, parents))
+
+                if len(connection_options) == 0:
+                    break
+
+                i, _, children, parents = \
+                    max(connection_options, key=lambda x: len(x[1]))
+                possible_connection_options.pop(i)
+
+                for child in children:
+                    for parent in child.parents & parents:
+                        parent.remove_connection(child)
+
+                connection_point = Node("point")
+                for parent in parents:
+                    parent.adopt(connection_point)
+                for child in children:
+                    child.r_adopt(connection_point)
 
     def sync(self):
         self.make_head_tail()
@@ -493,11 +495,10 @@ class Node:
             while True:
                 next_node, sub_part_struct = next_step(node_iter)
 
-                # if next_node == behind_end:  # not checking if it's in front
+                part_struct += sub_part_struct
                 if next_node == end:  # not checking if it's in front
                     return node_iter, part_struct
                 else:
-                    part_struct += sub_part_struct
                     node_iter = next_node
 
         # def restrictive_iterate_to(start: Node, end: Node, allowed: set[Node]):
@@ -579,9 +580,10 @@ class Node:
 
             return nodes_connected_to_last.pop(), struct_part
 
-        sectioned_list = self.sectioned_list_word_combine()
+        sectioned_list = self.sectioned_list()
         tail = self.get_tail()
-        return iterate_to(self.get_head(), tail)[1] + [tail]
+        head = self.get_head()
+        return iterate_to(head, tail)[1] + [tail]
 
     def structure_image(self: Node, text_size=100):
         def get_width(image):
@@ -731,7 +733,7 @@ class Node:
         x_margin = x_margin // 2
 
         img = compute_part(structure)
-        img.show()
+        # img.show()
 
     # <editor-fold desc="useless">
     def order_list(self: Node):

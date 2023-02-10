@@ -45,25 +45,32 @@ f = Node("f")
 
 # a.structure_image(100)
 
+# a.adopt(b)
+# b.adopt(c)
+#
+# d.parallelize(b)
+# e.parallelize(b)
+# f.parallelize(c)
+# a.sync()
+
+
 a.adopt(d)
 a.adopt(e)
-
-b.adopt(d)
-b.adopt(e)
-b.adopt(f)
-
-c.adopt(e)
-c.adopt(f)
-
 a.sync()
-a.structure_image()
+a.get_head().adopt(c)
+b.parallelize(a)
+a.sync()
 
-# a.adopt(d)
-# a.adopt(e)
-# a.sync()
-# a.get_head().adopt(c)
-# b.parallelize(a)
-# a.sync()
+import time
+start = time.time()
+print("Time elapsed on working...")
+for i in range(1000):
+    print(i, f"{time.time() - start:.2f}")
+    a.structure_image()
+
+end = time.time()
+print("Time consumed in working: ",end - start)
+
 
 # print(a.sectioned_list())
 # print(a.order_list())
