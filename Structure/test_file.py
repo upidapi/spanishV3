@@ -42,7 +42,7 @@ f = Node("f")
 # e.adopt(f)
 # d.adopt(f)
 # a.sync()
-#
+
 # a.structure_image(100)
 
 # a.adopt(b)
@@ -53,35 +53,35 @@ f = Node("f")
 # f.parallelize(c)
 # a.sync()
 
-
-# a.adopt(d)
-# a.adopt(e)
-# a.sync()
-# a.get_head().adopt(c)
-# b.parallelize(a)
-# a.sync()
-# a.structure_image()
+a.adopt(d)
+a.adopt(e)
+a.sync()
+a.get_head().adopt(c)
+b.parallelize(a)
+a.sync()
 
 # print(a.sectioned_list())
 # print(a.order_list())
 
-
-a.adopt(c)
-a.sync()
-a.r_insert(f)
-b.parallelize(a)
-d.parallelize(c)
-# b.contract()
-# e.sync()
-# a.get_head().adopt(e.get_head())
-a.sync()
-a.structure_image()
-
-# a.adopt(b)
-# b.adopt(c)
 # a.adopt(c)
 # a.sync()
-# a.structure_image()
+# print(a.gui_convert())
+# print(1, a.sectioned_list())
+# a.r_insert(z)
+# print(2, a.sectioned_list())
+# b.parallelize(a)
+# print(3, a.sectioned_list())
+# d.parallelize(c)
+# print(4, a.sectioned_list())
+# b.contract()
+# print(5, a.sectioned_list())
+# e.sync()
+# print(6, a.sectioned_list())
+# a.get_head().adopt(e.get_head())
+# print(7, a.sectioned_list())
+# a.sync()
+# print(8, a.sectioned_list())
+
 
 # def bp_find_f_pars():
 #     inp = "hello (wut() (nah) like)"

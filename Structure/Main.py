@@ -244,6 +244,9 @@ class Node:
 
     # <editor-fold desc="data fixers">
     def point_remove(self):
+        """
+        removes all points
+        """
         for node in self.get_all():
             if node.data == "point":
                 node.contract()
@@ -484,7 +487,7 @@ class Node:
                                         f"{[x.data for x in last_node]}")
 
                     last_node = last_node.pop()
-                    
+
                     # check if it's an "improper_bounding_box"
                     if len(set.intersection(*[children_in_front(parent) for parent in parents_behind(last_node)])) > 1:
                         improper_bounding_box = True
@@ -575,7 +578,7 @@ class Node:
         #         else:
         #             node_iter = next_node
 
-        def handle_improper_bounding_box(first_node: Node, last_node: Node):
+        def handle_improper_bounding_box():  # first_node: Node, last_node: Node):
             raise NotImplementedError("improper_bounding_box")
             # struct_part = []
             # to_be_cataloged = eventually_connect(first_node) & set(sum(sectioned_list[:section_index(last_node)], []))
@@ -596,7 +599,6 @@ class Node:
             # struct_part = [set(sectioned_list_part) & scope for sectioned_list_part in sectioned_list]
 
             # return {last_node}, struct_part + [last_node]
-
 
         def handle_proper_bounding_box(first_node: Node, last_node: Node):
             """
@@ -643,18 +645,23 @@ class Node:
             last_node, improper_bounding_box = get_box_end(f_ch)
 
             if improper_bounding_box:
-                nodes_connected_to_last, struct_part = handle_improper_bounding_box(node, last_node)
+                nodes_connected_to_last, struct_part = handle_improper_bounding_box()  # node, last_node)
             else:
                 nodes_connected_to_last, struct_part = handle_proper_bounding_box(node, last_node)
 
             return nodes_connected_to_last.pop(), struct_part
 
-        def temp_name(node: Node) -> None:
+        def resolve_hidden_boxes(node: Node) -> None:
             """
-            makes it so that multiple boxes don't start from the same node
+            Adds a point before some "hidden" boxes.
+
+            A hidden box is a box whose start is the same as
+            another box start. The point is added so that the
+            start is a point instead of the same as the other
+            start.
             """
 
-            def cal_tree(current, options):
+            def compute_part(current: set[Node], options: list[set[Node]]):
                 if len(current) == 1:
                     return current
 
@@ -670,7 +677,7 @@ class Node:
                 cataloged = set()
                 while len(possible) > 0:
                     cataloged |= set(possible[0])
-                    sub_point, possible = cal_tree(possible[0], possible)
+                    sub_point, possible = compute_part(possible[0], possible)
                     some_point.add_connection(sub_point)
 
                 for connection_node in set(current) - cataloged:
@@ -683,8 +690,6 @@ class Node:
                 parents_behind_node = parents_behind(node)
                 if len(parents_behind_node) > 1:
                     box_start, improper_bounding_box = get_box_start(parents_behind_node)
-                    # if not improper_bounding_box:
-                    #     if node != box_start:
                     box_starts.append((box_start, node))
 
             while True:
@@ -692,7 +697,6 @@ class Node:
                     break
 
                 box_start_node = box_starts[0][0]
-                # box_starts.pop(0)
 
                 # all nodes with the same "box start"
                 same_box_start = [box_start[1] for box_start in box_starts
@@ -712,7 +716,10 @@ class Node:
                 for rm_connection_node in box_start_children:
                     box_start_node.remove_connection(rm_connection_node)
 
-                box_start_node.add_connection(cal_tree(max(points_children, key=lambda x: len(x)), points_children)[0])
+                box_start_node.add_connection(compute_part(
+                    max(points_children, key=lambda x: len(x)),
+                    points_children)[0])
+
                 next(iter(box_start_node.children)).contract()
 
         def prevent_start_end_connection(node: Node) -> None:
@@ -733,7 +740,7 @@ class Node:
                         box_end.r_adopt(some_point)
 
         sectioned_list = self.sectioned_list()
-        temp_name(self)
+        resolve_hidden_boxes(self)
         sectioned_list = self.sectioned_list()
         prevent_start_end_connection(self)
         sectioned_list = self.sectioned_list()
@@ -899,199 +906,6 @@ class Node:
 
         img = compute_part(structure)
         img.show()
-
-    # <editor-fold desc="useless">
-    def order_list(self: Node):
-        things_left: list[list[Node]] = self.sectioned_list_word_combine()
-        path: list[Node] = [self.get_head()]
-        ordered: list[list[Node]] = [[] for _ in range(len(things_left))]
-        ordered[0] = path.copy()
-
-        while len(path) > 0:
-            cur = path[-1]
-            pos = len(path) - 1
-
-            # prio:  same_row_reference => child => super_sibling => parent
-            # prio pos dif: (0) => (> 0) => ("0") => (< 0)
-
-            # same_row_reference
-            if len(cur.children) == 1 and cur.children & set(things_left[pos]):
-                one_child = next(iter(cur.children))
-                if len(one_child.parents) == 1:
-                    things_left[pos].remove(one_child)
-                    ordered[pos].append(one_child)
-                    path[-1] = one_child
-                    continue
-
-            # child
-            if pos + 1 < len(things_left):
-                t = list(cur.children & set(things_left[pos + 1]))
-                if t:
-                    things_left[pos + 1].remove(t[0])
-                    ordered[pos + 1].append(t[0])
-                    path.append(t[0])
-                    continue
-
-            # super_sibling
-            t = list(cur.super_siblings & set(things_left[pos]))
-            if t:
-                things_left[pos].remove(t[0])
-                ordered[pos].append(t[0])
-                path[-1] = t[0]
-                continue
-
-            # # siblings
-            # t = list(cur.siblings & set(things_left[pos]))
-            # if t:
-            #     things_left[pos].remove(t[0])
-            #     ordered[pos].append(t[0])
-            #     path[-1] = t[0]
-            #     continue
-
-            # parent
-            path.pop(-1)
-
-        return ordered
-    # </editor-fold>
-
-    # <editor-fold desc="reference implementation">
-    def sectioned_list_word_combine(self: Node):
-        def push_forward(node):
-            for x in layers:
-                try:
-                    x.remove(node)
-                except ValueError:
-                    pass
-                else:
-                    things.remove(node)
-
-        def word_extend(node):
-            if len(node.children) == 1:
-                one_child = next(iter(node.children))
-                if len(one_child.parents) == 1 and len(one_child.data) == 1:
-                    return [node] + word_extend(one_child)
-            return [node]
-
-        ignore_push = set()  # don't push anything from ignore
-        things = []
-        layers = []
-        queue = [self.get_head()]
-
-        while len(queue) > 0:
-            next_queue = set()
-            layers.append(queue)
-            things += queue
-
-            for thing in queue:
-                if things.count(thing) == 1:  # same as "< 2"
-                    children = set(x for x in thing.children if x != thing) - ignore_push
-                    for child in children:
-                        if child not in ignore_push:
-                            push_forward(child)
-                            temp = set(word_extend(child))
-                            next_queue |= temp
-                            temp.remove(child)
-                            ignore_push |= temp
-
-            queue = list(next_queue)
-
-        return layers
-
-    def display_nodes(self: Node):
-        # might need to check if node.word_exclusive_child is in column
-        def recursion(node):
-            temp = node.word_exclusive_child
-            if temp:
-                return [node, *recursion(temp)]
-            return [node]
-
-        if len(self.data) == 1:
-            return recursion(self)
-        return []
-
-    @staticmethod
-    def convert_nodes_text(nodes: list[Node]):
-        word = ""
-        for node in nodes:
-            word += node.data
-        return word
-
-    def get_width(self):
-        return font.getbbox(
-            self.convert_nodes_text(self.display_nodes())
-        )[2]
-
-    def gui_convert(self: Node, text_size=100):
-        # ordered_list = structure.order_list()
-        global font
-
-        # ordered_list = [["head", ], ["a", "b", "c", ], ["d", "point", ], ["e", "f", "g", ], ["tail", ]]
-        ordered_list = self.order_list()
-
-        font = ImageFont.truetype('arial.ttf', text_size)
-        _, _, x_margin, text_height = font.getbbox("ooo")
-        y_margin = text_height // 2
-
-        text_x = []
-        for col in ordered_list:
-            max_x = 0
-            for node in col:
-                max_x = max(node.get_width(), max_x)
-            text_x.append(max_x)
-
-        text_y = [text_height * len(col) for col in ordered_list]
-        # print(text_x, text_y)
-
-        img = Image.new("RGBA", (
-            sum(text_x) + x_margin * (len(text_x) - 1),
-            max(text_y) + y_margin * (len(text_y) - 1)))
-        draw = ImageDraw.Draw(img)
-
-        text_pos = {}
-        for i, col in enumerate(ordered_list):
-            x_pos = sum(text_x[:i]) + i * x_margin
-
-            for j, row in enumerate(col):
-                y_pos = j * (text_height + y_margin)
-                width = row.get_width()
-
-                text_pos[row] = x_pos, y_pos, width, col
-
-        text_pos_left = text_pos.copy()
-        while len(text_pos_left) > 0:
-            # img.show()
-            node = next(iter(text_pos_left.keys()))
-            x, y, w, col = text_pos[node]
-            del text_pos_left[node]
-
-            if len(node.data) == 1:
-                nodes_displayed = node.display_nodes()
-                for rm_node in nodes_displayed:
-                    text_pos_left.pop(rm_node, None)
-                draw.text((x, y), node.convert_nodes_text(nodes_displayed), fill=(0, 0, 0), font=font)
-                w = node.get_width()
-                node = nodes_displayed[-1]
-
-            if node.data == "head":
-                for child in node.children:
-                    cx, cy, cw, _ = text_pos[child]
-                    draw.line(((0, cy + text_height // 2),
-                               (cx, cy + text_height // 2)))
-                continue
-            for child in node.children:
-                cx, cy, cw, _ = text_pos[child]
-                if child.data == "tail":
-                    draw.line(((x + w, y + text_height // 2),
-                               (cx + cw + 10, y + text_height // 2)))
-
-                    continue
-                draw.line(connect((x + w, y + text_height // 2),
-                                  (cx, cy + text_height // 2)))
-                # draw.line(((x + w, y + text_height // 2),
-                #           (cx, cy + text_height // 2)))
-
-        img.show()
-    # </editor-fold>
 
     # </editor-fold>
 
