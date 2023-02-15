@@ -450,24 +450,30 @@ class Node:
 
             return out
 
-        def eventually_connect_to(node: Node) -> set[Node]:
+        def eventually_connect_from(node: Node) -> set[Node]:
             out = parents_behind(node)
             for parent in out.copy():
-                out |= eventually_connect_to(parent)
+                out |= eventually_connect_from(parent)
 
             return out
 
         def parents_behind(node: Node) -> set[Node]:
             return node.parents & set(behind(node))
 
-        def get_last_node(children) -> tuple[Node, bool]:
+        def get_box_end(children) -> tuple[Node, bool]:
+            """
+            gets the first node that all children leeds to
+                If they lead exclusively to that node then it
+                returns (Node, False) ("improper_bounding_box" is false).
+                Otherwise, it returns (Node, True).
+            """
             improper_bounding_box = False  # flag
             shared_forward_nodes = set.intersection(*[eventually_connect(child) | {child} for child in children])
 
-            # add all children in "f_ch" that are before the first "shared_forward_nodes" to
+            # add all children in "f_ch" that are before the first "shared_backwards_nodes" to
             # "nodes_to_iterate"
             for part in sectioned_list:
-                # break when it finds the first "shared_forward_nodes"
+                # break when it finds the first "shared_backwards_nodes"
                 if any(x in shared_forward_nodes for x in part):
                     # get the last_node
                     last_node = shared_forward_nodes & set(part)
@@ -487,19 +493,73 @@ class Node:
 
                     return last_node, improper_bounding_box
 
-        # name is fucking misleading
+        def get_box_start(parents, find_proper_bounding_box=True) -> tuple[Node, bool]:
+            """
+            reverse of get_box_end()
+            """
+            improper_bounding_box = False  # flag
+            shared_backwards_nodes = set.intersection(*[
+                eventually_connect_from(parent) | {parent} for parent in parents])
+
+            # add all children in "f_ch" that are before the first "shared_backwards_nodes" to
+            # "nodes_to_iterate"
+            for part in sectioned_list[::-1]:
+                # break when it finds the first "shared_backwards_nodes"
+                if any(x in shared_backwards_nodes for x in part):
+                    # get the first_node
+                    first_node = shared_backwards_nodes & set(part)
+
+                    if len(first_node) > 1:
+                        raise TypeError(f"there should be a point from "
+                                        f"{[x.data for x in shared_backwards_nodes]} to"
+                                        f"{[x.data for x in first_node]}")
+
+                    first_node = first_node.pop()
+
+                    # check if it's an "improper_bounding_box"
+                    if len(set.intersection(*[parents_behind(child) for child in children_in_front(first_node)])) > 1:
+                        improper_bounding_box = True
+                        if find_proper_bounding_box:
+                            # continue until you actually find a "proper_box"
+                            continue
+
+                    return first_node, improper_bounding_box
+
         def iterate_to(start: Node, end: Node) -> tuple[Node, StructureType]:
+            """
+            builds the struct from "start" to node before "end"
+            (unless that node is an end of a
+
+            iterate_to(a, d) => c, [a, b, c]
+               a - b - c - d
+            """
+
             node_iter = start
             part_struct: StructureType = [start]
 
             while True:
-                next_node, sub_part_struct = next_step(node_iter)
+                f_ch = children_in_front(node_iter)
 
-                part_struct += sub_part_struct
-                if next_node == end:  # not checking if it's in front
-                    return node_iter, part_struct
+                if len(f_ch) == 0:
+                    raise TypeError(f"got to tail before finding end ({end=} is before {start=})")
+
+                elif len(f_ch) == 1:
+                    out = f_ch.pop()
+
+                    if out != end:
+                        node_iter = out
+                        part_struct.append(out)
+                        continue
+
                 else:
-                    node_iter = next_node
+                    next_node, sub_part_struct = next_box(node_iter)
+                    part_struct += sub_part_struct
+
+                    if next_node != end:
+                        node_iter = next_node
+                        continue
+
+                return node_iter, part_struct
 
         # def restrictive_iterate_to(start: Node, end: Node, allowed: set[Node]):
         #     behind_end = parents_behind(end)
@@ -507,7 +567,7 @@ class Node:
         #     part_struct = [start]
         #
         #     while True:
-        #         next_node, sub_part_struct = next_step(node_iter)
+        #         next_node, sub_part_struct = next_box(node_iter)
         #         part_struct += sub_part_struct
         #
         #         if next_node in behind_end:  # not checking if it's in front
@@ -516,22 +576,35 @@ class Node:
         #             node_iter = next_node
 
         def handle_improper_bounding_box(first_node: Node, last_node: Node):
-            struct_part = []
+            raise NotImplementedError("improper_bounding_box")
+            # struct_part = []
             # to_be_cataloged = eventually_connect(first_node) & set(sum(sectioned_list[:section_index(last_node)], []))
-            for part in sectioned_list[section_index(first_node):section_index(last_node)]:
-                struct_part += part
-                # sub_part = []
-                # for node in to_be_cataloged & set(part):
-                #     f_ch = children_in_front(node)
-                #     last_node, improper_bounding_box = get_last_node(f_ch)
-                #
-                #     if improper_bounding_box:
-                #         continue
-            return {last_node}, struct_part
+            # for part in sectioned_list[section_index(first_node):section_index(last_node)]:
+            #     struct_part += part
+            #     # sub_part = []
+            #     # for node in to_be_cataloged & set(part):
+            #     #     f_ch = children_in_front(node)
+            #     #     last_node, improper_bounding_box = get_box_end(f_ch)
+            #     #
+            #     #     if improper_bounding_box:
+            #     #         continue
+            # scope = eventually_connect(first_node) & eventually_connect_from(last_node)
 
-            # to be cataloged
+            # struct_part = []
+            # for sectioned_list_part in sectioned_list:
+
+            # struct_part = [set(sectioned_list_part) & scope for sectioned_list_part in sectioned_list]
+
+            # return {last_node}, struct_part + [last_node]
+
 
         def handle_proper_bounding_box(first_node: Node, last_node: Node):
+            """
+            handle_proper_bounding_box(a) => d, [(b, c), d]
+                a - b - d
+                  - c -
+            """
+
             struct_part: StructureType = []
             cataloged_last_nodes = set()
 
@@ -539,6 +612,11 @@ class Node:
 
             # iterate all sub-parts inside box
             for child in set(step_forward):
+                if child == last_node:
+                    raise TypeError(f"Start of a box can't connect to it's own end. "
+                                    f"((first_node: {first_node}) connects to "
+                                    f"(last_node: {last_node}))")
+
                 sub_nodes_before_last, sub_struct_part = iterate_to(child, last_node)
                 struct_part.append(sub_struct_part)
                 cataloged_last_nodes.add(sub_nodes_before_last)
@@ -553,25 +631,16 @@ class Node:
             # return incomplete box 
             return set(cataloged_last_nodes), struct_part
 
-        def next_step(node: Node) -> tuple[Node, StructureType]:
+        def next_box(node: Node) -> tuple[Node, StructureType]:
             """
-            computes the next step after node
-            next_step(a) => d, [(b, c), d]
-                a - b - d
-                  - c -
-            next_step(a) => b, [b]
-                a - b - d
+            computes the next box after node
+
+            see "handle_proper_bounding_box()" and "handle_improper_bounding_box()" for examples
             """
 
             f_ch = children_in_front(node)
 
-            if len(f_ch) == 0:
-                raise TypeError("wut (kys)")
-            if len(f_ch) == 1:
-                out = f_ch.pop()
-                return out, [out]
-
-            last_node, improper_bounding_box = get_last_node(f_ch)
+            last_node, improper_bounding_box = get_box_end(f_ch)
 
             if improper_bounding_box:
                 nodes_connected_to_last, struct_part = handle_improper_bounding_box(node, last_node)
@@ -580,9 +649,97 @@ class Node:
 
             return nodes_connected_to_last.pop(), struct_part
 
+        def temp_name(node: Node) -> None:
+            """
+            makes it so that multiple boxes don't start from the same node
+            """
+
+            def cal_tree(current, options):
+                if len(current) == 1:
+                    return current
+
+                possible = []
+                for option in options:
+                    if next(iter(option)) in current and len(current) > len(option):
+                        possible.append(option)
+
+                some_point = Node("point")
+
+                possible.sort(key=lambda x: len(x), reverse=True)
+
+                cataloged = set()
+                while len(possible) > 0:
+                    cataloged |= set(possible[0])
+                    sub_point, possible = cal_tree(possible[0], possible)
+                    some_point.add_connection(sub_point)
+
+                for connection_node in set(current) - cataloged:
+                    some_point.add_connection(connection_node)
+
+                return some_point, possible
+
+            box_starts = []
+            for node in node.get_all():
+                parents_behind_node = parents_behind(node)
+                if len(parents_behind_node) > 1:
+                    box_start, improper_bounding_box = get_box_start(parents_behind_node)
+                    # if not improper_bounding_box:
+                    #     if node != box_start:
+                    box_starts.append((box_start, node))
+
+            while True:
+                if len(box_starts) <= 1:
+                    break
+
+                box_start_node = box_starts[0][0]
+                # box_starts.pop(0)
+
+                # all nodes with the same "box start"
+                same_box_start = [box_start[1] for box_start in box_starts
+                                  if box_start[0] == box_start_node]
+
+                box_starts = [box_start for box_start in box_starts
+                              if box_start[0] != box_start_node]
+
+                if len(same_box_start) == 1:
+                    break
+
+                box_start_children = children_in_front(box_start_node)
+                # list of all children of all same_box_start
+                points_children = [box_start_children & eventually_connect_from(node)
+                                   for node in same_box_start]
+
+                for rm_connection_node in box_start_children:
+                    box_start_node.remove_connection(rm_connection_node)
+
+                box_start_node.add_connection(cal_tree(max(points_children, key=lambda x: len(x)), points_children)[0])
+                next(iter(box_start_node.children)).contract()
+
+        def prevent_start_end_connection(node: Node) -> None:
+            """
+            Prevents all "box start" from connecting to its own "box end".
+
+            By adding a point in the middle.
+            """
+
+            for node in node.get_all():
+                children_in_front_node = children_in_front(node)
+                if len(children_in_front_node) > 1:
+                    box_end, _ = get_box_end(children_in_front_node)
+                    if box_end in children_in_front_node:
+                        node.remove_connection(box_end)
+                        some_point = Node("point")
+                        node.adopt(some_point)
+                        box_end.r_adopt(some_point)
+
+        sectioned_list = self.sectioned_list()
+        temp_name(self)
+        sectioned_list = self.sectioned_list()
+        prevent_start_end_connection(self)
         sectioned_list = self.sectioned_list()
         tail = self.get_tail()
         head = self.get_head()
+
         return iterate_to(head, tail)[1] + [tail]
 
     def structure_image(self: Node, text_size=100):
@@ -593,6 +750,7 @@ class Node:
             return image.size[1]
 
         def compute_part(part_struct) -> Image:
+
             def should_draw_line(j):
                 if isinstance(part_struct[j], tuple):
                     return False
@@ -615,15 +773,21 @@ class Node:
                     text = part_struct.data
 
                 _, _, width, height = font.getbbox(text)
+
+                # make space for the line
+                if height == 0:
+                    height = 1
+
                 sub_image = Image.new("RGBA", (width, height))
                 draw = ImageDraw.Draw(sub_image)
-                # draw.rectangle((0, 0) + sub_image.size, fill=(255, 100, 255))
+                draw.rectangle((0, 0) + sub_image.size, fill=(255, 100, 255))
                 draw.text((0, 0), text, fill=(0, 0, 0), font=font)
 
                 return sub_image
 
             if isinstance(part_struct, list):
-                total_width = - x_margin  # remove first connection
+                ignored_first_connection = False
+                total_width = 0
                 max_height = 0
                 image_parts = []
 
@@ -633,8 +797,9 @@ class Node:
 
                     total_width += get_width(img_part)
 
-                    if should_draw_line(i):
+                    if should_draw_line(i) and ignored_first_connection:
                         total_width += x_margin
+                    ignored_first_connection = True
 
                     max_height = max(max_height, get_height(img_part))
 
@@ -733,7 +898,7 @@ class Node:
         x_margin = x_margin // 2
 
         img = compute_part(structure)
-        # img.show()
+        img.show()
 
     # <editor-fold desc="useless">
     def order_list(self: Node):
