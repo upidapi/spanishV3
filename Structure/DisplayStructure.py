@@ -1,7 +1,7 @@
 from . import Node, StructureType
+from Bezier import connect
 
 from PIL import Image, ImageFont, ImageDraw
-from Bezier import connect
 
 
 def get_sectioned_list(struct_node: Node):

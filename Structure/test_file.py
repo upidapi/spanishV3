@@ -1,4 +1,4 @@
-from Main import Node
+from . import Node, structure_image
 from Constructor import convert
 # a = convert("hello")
 # b = convert("hi")
