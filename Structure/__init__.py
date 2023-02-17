@@ -1,1 +1,2 @@
-from Main import Node
+from Main import Node, StructureType
+from DisplayStructure import structure_image
