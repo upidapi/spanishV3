@@ -285,6 +285,18 @@ class Node:
         for thing in tails:
             thing.adopt(tail)
 
+    def head_tail_simplify(self):
+        """
+        removes all heads that have parents
+        removes all tail that have children
+        """
+
+        for node in self.get_all():
+            if node.data == "head" and node.parents:
+                node.contract()
+            if node.data == "tail" and node.children:
+                node.contract()
+
     def point_simplify(self):
         """
         Tries to visually simplify the structure by creating points where
@@ -383,7 +395,7 @@ class Node:
         """
         runs all "data fixers" on self
         """
-
+        self.head_tail_simplify()
         self.make_head_tail()
         self.point_simplify()
     # </editor-fold>
