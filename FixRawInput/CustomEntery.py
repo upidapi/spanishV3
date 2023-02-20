@@ -348,9 +348,9 @@ class TextEntry:
 
         # binds things
         self.custom_bind('s', self.split, mod='ctrl')
-        self.custom_bind('<Delete>', self.delete_instance, do_extra=Data.root.focus)
-        self.custom_bind('<Return>', self.save, do_extra=Data.root.focus)
-        self.custom_bind('<Escape>', self.revert_changes, do_extra=Data.root.focus)
+        self.custom_bind('<Delete>', self.delete_instance, do_extra=Data.root.focused_entry)
+        self.custom_bind('<Return>', self.save, do_extra=Data.root.focused_entry)
+        self.custom_bind('<Escape>', self.revert_changes, do_extra=Data.root.focused_entry)
 
         self.custom_bind('<KeyRelease>')
         self.custom_bind('<KeyPress>')

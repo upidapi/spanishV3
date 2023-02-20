@@ -253,7 +253,7 @@ class NewFilePart(SuperPart):
         self.handler.place_all()
 
     def un_focus(self, _=None):
-        self.parent.focus()
+        self.parent.focused_entry()
         self.del_references()
 
     def save_file(self, _):
@@ -273,7 +273,7 @@ class NewFilePart(SuperPart):
             if self.part_type is not DataPart:
                 os.mkdir(file_path)
 
-            self.part_type(self.parent, file_path).focus()
+            self.part_type(self.parent, file_path).focused_entry()
             self.del_references()
 
 

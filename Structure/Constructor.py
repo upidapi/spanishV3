@@ -13,6 +13,7 @@ def convert_linear_word(text: str) -> Node:
 
 def or_convert(text: str) -> Node:
     text.split("/")
+
     return Node("")  # temporary
 
 
@@ -58,7 +59,6 @@ def replace(replace_str: str, with_str: str, struct_node: Node) -> None:
                 node.remove()
 
 
-"""
-if a head has a parent contact it
-oposite for tail
-"""
+def make_optional(replace_str: str, struct_node: Node) -> None:
+    replace(replace_str, "", struct_node)
+

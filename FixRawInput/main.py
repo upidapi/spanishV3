@@ -31,7 +31,7 @@ def entries_setup(root, data):
     # adds all the enters
     Handler.populate(data)
     # to prevent the last added entry from being focused
-    root.focus()
+    root.focused_entry()
     Handler.update_tr_lines()
     # binds
 
