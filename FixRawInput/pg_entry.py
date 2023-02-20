@@ -1,7 +1,34 @@
 from __future__ import annotations
 
+import math
+import random
+
 import pygame as pg
 
+
+DEFAULT_BG = (255, 255, 255)
+
+def get_n_good_colours(n):
+    def hsv_to_rgb(h, s, v):
+        i = math.floor(h * 6)
+        f = h * 6 - i
+        p = v * (1 - s)
+        q = v * (1 - f * s)
+        t = v * (1 - (1 - f) * s)
+
+        r, g, b = [
+            (v, t, p),
+            (q, v, p),
+            (p, v, t),
+            (p, q, v),
+            (t, p, v),
+            (v, p, q),
+        ][int(i % 6)]
+
+        return r, b, g
+
+    colours = [hsv_to_rgb(i / (n + 1), 1, 1) for i in range(n)]
+    return random.shuffle(colours)
 
 class Entry:
     """
@@ -94,7 +121,7 @@ class Entry:
             self.pos = (pos[0] + self.delta_drag_start[0],
                         pos[1] + self.delta_drag_start[1])
 
-    def handle_event(self, events):
+    def handle_event(self, event):
         def handle_drag_event():
             if event.type == pg.MOUSEBUTTONDOWN:
                 self.delta_drag_start = \
@@ -115,31 +142,30 @@ class Entry:
             else:
                 self.drag(event.pos)
 
-        for event in events:
-            shift = pg.key.get_mods() & pg.KMOD_SHIFT
-            ctrl = pg.key.get_mods() & pg.KMOD_CTRL
+        shift = pg.key.get_mods() & pg.KMOD_SHIFT
+        ctrl = pg.key.get_mods() & pg.KMOD_CTRL
 
-            # might cause problem
-            if event.button == 3:  # right click
-                handle_drag_event()
+        # might cause problem
+        if event.button == 3:  # right click
+            handle_drag_event()
 
-            if event.type == pg.KEYDOWN:
-                if ctrl:
-                    if event.key == pg.K_s:
-                        self.checkpoint()
+        if event.type == pg.KEYDOWN:
+            if ctrl:
+                if event.key == pg.K_s:
+                    self.checkpoint()
 
-                    if event.key == pg.K_z:
-                        self.load_checkpoint()
+                if event.key == pg.K_z:
+                    self.load_checkpoint()
 
-                if event.key == pg.K_d:
-                    self.split()
+            if event.key == pg.K_d:
+                self.split()
 
-                if event.key == pg.K_DELETE:
-                    self.delete()
+            if event.key == pg.K_DELETE:
+                self.delete()
 
-            if event.type == pg.MOUSEBUTTONDOWN:
-                if event.button == 2:  # middle click
-                    self.delete()
+        if event.type == pg.MOUSEBUTTONDOWN:
+            if event.button == 2:  # middle click
+                self.delete()
 
 
 class Controller:
@@ -147,15 +173,19 @@ class Controller:
     singleton
 
     features
-        hide all entry's
-            ctrl + e
-
         change lan translation
-            ctrl + q
+            ctrl + r
             switch from one lan to another in all entry's
+
+        hide all entry's
+            ctrl + q
 
         display unique background
             ctrl + w
+            change all background's to be a unique colour
+
+        display pair background
+            ctrl + e
             change all background's to be a unique colour
 
     """
@@ -169,7 +199,9 @@ class Controller:
         return cls.instance
 
     def __init__(self):
-        self.focused_entry = None
+        self.focused_entry: Entry | None = None
+
+        self.show_entries = True
 
         self.entries = []
 
@@ -182,3 +214,43 @@ class Controller:
 
     def focus(self, entry):
         self.focused_entry = entry
+
+    def change_lan(self):
+        for entry in self.entries:
+            entry.text, entry.o_text = entry.o_text, entry.text
+
+    def unique_background(self):
+        for entry in self.entries:
+            pass
+
+    def pair_background(self):
+        pairs = 0
+        undocumented_pairs = self.entries
+        while True:
+            if not len(undocumented_pairs):
+                break
+
+            temp = undocumented_pairs[0]
+
+
+            pairs += 1
+
+        get_n_good_colours(len(self.entries))
+        for entry in self.entries:
+            entry.background_colour =
+
+    def handle_events(self):
+        for event in pg.event.get():
+            self.focused_entry.handle_event(event)
+
+            if pg.key.get_mods() & pg.KMOD_CTRL:
+                # hide entries
+                if event.key == pg.K_q:
+                    self.show_entries = False
+                # unique background
+                if event.key == pg.K_w:
+                    self.unique_background()
+                # pair background
+                if event.key == pg.K_e:
+                    self.pair_background()
+
