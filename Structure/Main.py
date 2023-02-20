@@ -184,14 +184,6 @@ class Node:
         return cataloged
 
     def get_head(self) -> Node:
-        # head = []
-        # if self.data == "head":
-        #     head.append(self)
-        # for parent in self.parents:
-        #     if parent.data == "head":
-        #         return parent
-        #     if parent != self:
-        #         head.append(parent.get_head())
         head = []
         for node in self.get_all():
             if node.data == "head":
@@ -203,16 +195,7 @@ class Node:
             raise TypeError("0 heads found")
         raise TypeError("multiple heads found")
 
-        # self.sync()
-        # return self.get_head()
-
     def get_tail(self) -> Node:
-        # if self.data == "tail":
-        #     tail.append(self)
-        # for child in self.children:
-        #     if child.data == "tail":
-        #         return child
-        #     tail.append(child.get_tail())
         tail = []
         for node in self.get_all():
             if node.data == "tail":
