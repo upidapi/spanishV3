@@ -31,7 +31,7 @@ def temp_func_3(_, data_files):
 
 # temporary implementation to use Structure module instead of the old Data module
 def temp_func_2(data: list) -> tuple[list[dict, ...], list[dict, ...]]:
-    from Structure.Constructor import convert, TempName
+    from Structure.Constructor import convert_linear_word, TempName
     from Structure.Helpers import OrStatement
 
     w1_to_w2 = []
@@ -56,8 +56,8 @@ def temp_func_2(data: list) -> tuple[list[dict, ...], list[dict, ...]]:
         #  [hej, tjena] => [hola, oye]
         #  [halå, tjena] => [hola, oye]
 
-        w1_to_w2.append({'word': pair[0], 'translation': convert(pair[1], blueprint)})
-        w2_to_w1.append({'word': pair[1], 'translation': convert(pair[0], blueprint)})
+        w1_to_w2.append({'word': pair[0], 'translation': convert_linear_word(pair[1], blueprint)})
+        w2_to_w1.append({'word': pair[1], 'translation': convert_linear_word(pair[0], blueprint)})
         # for word in pair[0]:
         #     w1_to_w2.append({'word': word, 'translation': pair[1]})
         #     # if word in w1_to_w2:

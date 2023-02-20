@@ -1,5 +1,10 @@
-from . import Node, structure_image
-from Constructor import convert
+# from . import Node, structure_image
+# from Constructor import convert_linear_word
+
+
+from Main import Node, StructureType
+from DisplayStructure import structure_image
+
 # a = convert("hello")
 # b = convert("hi")
 # c = convert("today")
@@ -59,7 +64,7 @@ a.sync()
 a.get_head().adopt(c)
 b.parallelize(a)
 a.sync()
-
+structure_image(a)
 # print(a.sectioned_list())
 # print(a.order_list())
 

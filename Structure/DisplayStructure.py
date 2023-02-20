@@ -1,4 +1,7 @@
-from . import Node, StructureType
+# from . import Node, StructureType
+
+from Main import Node, StructureType
+
 from Bezier import connect
 
 from PIL import Image, ImageFont, ImageDraw
