@@ -5,8 +5,8 @@ import random
 
 import pygame as pg
 
-
 DEFAULT_BG = (255, 255, 255)
+
 
 def get_n_good_colours(n):
     def hsv_to_rgb(h, s, v):
@@ -27,7 +27,7 @@ def get_n_good_colours(n):
 
         return r, b, g
 
-    colours = [hsv_to_rgb(i / (n + 1), 1, 1) for i in range(n)]
+    colours = [[x * 255 for x in hsv_to_rgb(i / (n + 1), 1, 1)] for i in range(n)]
     random.shuffle(colours)
     return colours
 
@@ -62,16 +62,20 @@ class Entry:
             not ctrl + esc (handled by Controller)
     """
 
-    def __init__(self, handler: type(Controller)):
+    def __init__(self,
+                 handler: type(Controller),
+                 text: str = "",
+                 pos: tuple[int, int] = (0, 0),
+                 ):
         self.handler: Controller = handler
         self.handler.entries.append(self)
 
-        self.background_colour = (0, 0, 0)
+        self.background_colour = DEFAULT_BG
 
-        self.text: str = ""
+        self.text: str = text
         self.o_text: str = ""
 
-        self.pos: tuple[int, int] = (0, 0)
+        self.pos: tuple[int, int] = pos
         self.size: tuple[int, int] = (0, 0)
         self.update_size()
 
@@ -82,6 +86,7 @@ class Entry:
 
     def delete(self):
         self.handler.entries.remove(self)
+        self.handler.un_focus(self)
 
     def focus(self):
         self.handler.focus(self)
@@ -263,6 +268,9 @@ class Controller:
     def focus(self, entry):
         self.focused_entry = entry
 
+    def un_focus(self, entry):
+        self.focused_entry = None
+
     def change_lan(self):
         for entry in self.entries:
             entry.text, entry.o_text = entry.o_text, entry.text
@@ -298,10 +306,16 @@ class Controller:
 
     def handle_event(self, event):
         if event.type == pg.MOUSEBUTTONDOWN:
+            over = self.over_entries(event.pos)
             if event.button == 1:
-                over = self.over_entries(event.pos)
                 if over:
                     self.focus(over[0])
+            if event.button == 2:  # create/remove entry
+                if over:
+                    over[0].delete()
+                else:
+                    entry = Entry(self, pos=event.pos)
+                    entry.focus()
 
         if self.focused_entry is not None:
             self.focused_entry.handle_event(event)
@@ -384,7 +398,7 @@ class Controller:
 
         possible_pairs = self.get_connections()
 
-        tr_pairs = []
+        tr_pairs: list[tuple[Entry, Entry]] = []
         non_pairs = []
 
         data.sort(key=lambda x: x.pos[0])  # sort by x pos
@@ -409,8 +423,9 @@ class Controller:
                 if connection.pos[0] < best_cn.pos[0]:
                     best_cn = connection
 
-            tr_pairs.append((current_point, best_cn))
-            data.remove(best_cn)
+            tr_pairs.append(best_cn)
+            if best_cn in data:
+                data.remove(best_cn)
 
             # don't reference a paired line
             best_cn_cns = connects_to(best_cn)
@@ -425,8 +440,46 @@ class Controller:
     # </editor-fold>
 
     def draw(self):
+        self.update_pairs()
+
         def draw_connections():
-            pass
+            for a, b in self.pairs:
+                if a.pos[0] > b.pos[0]:
+                    a, b = b, a
+
+                if a.pos[1] < b.pos[1]:
+                    # a over b
+                    a_rel = 0, 0
+                    b_rel = b.pos[0] - a.pos[0], b.pos[1] - a.pos[1]
+                else:
+                    # a under b
+                    a_rel = 0, a.pos[1] - b.pos[1]
+                    b_rel = b.pos[0] - a.pos[0], 0
+
+                surface_size = (b.pos[0] - a.pos[0] + b.size[0],
+                                abs(b.pos[1] - a.pos[1]) + b.size[1])
+
+                image = pg.Surface(surface_size, pg.SRCALPHA, 32)
+                image = image.convert_alpha()
+
+                pg.draw.line(image, (0, 0, 0),
+                             (a_rel[0] + a.size[0] / 2,
+                              a_rel[1] + a.size[1] / 2),
+                             (b_rel[0] + b.size[0] / 2,
+                              b_rel[1] + b.size[1] / 2))
+
+                def remove_colour(pos, size):
+                    s = pg.Surface(size)  # the size of your rect
+                    s.set_alpha(255)  # alpha level
+                    s.fill((255, 255, 255))  # this fills the entire surface
+                    self.surface.blit(s, pos)
+
+                remove_colour(a_rel, a.size)
+                remove_colour(b_rel, b.size)
+
+                self.surface.blit(image,
+                                  (min(a.pos[0], b.pos[0]),
+                                   min(a.pos[1], b.pos[1])))
 
         if self.show_entries:
             draw_connections()
@@ -438,9 +491,10 @@ pg.init()
 
 screen = pg.display.set_mode([500, 500])
 cont = Controller(screen)
-entry = Entry(cont)
-entry.text = "hello"
-entry.update_size()
+
+for x in range(10):
+    Entry(cont, str(x), (10, x*50))
+
 clock = pg.time.Clock()
 
 running = True
@@ -452,7 +506,7 @@ while running:
             running = False
 
     screen.fill((255, 255, 255))
-    entry.draw()
+    cont.draw()
 
     pg.display.flip()
     clock.tick(60)
