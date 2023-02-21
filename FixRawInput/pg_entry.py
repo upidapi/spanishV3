@@ -87,7 +87,7 @@ class Entry:
 
     @property
     def has_focus(self):
-        return self.handler.focus == self
+        return self.handler.focused_entry == self
 
     def delete(self):
         self.handler.entries.remove(self)
@@ -210,12 +210,12 @@ class Entry:
         def apply_tint(colour):
             pass
 
+        text_colour = (0, 0, 0)
         if self in self.handler.non_pairs:
-            apply_tint("red")
+            text_colour = (255, 0, 0)
 
         if self.has_focus:
-            apply_tint("blue")
-            print(self)
+            text_colour = (0, 255, 0)
 
         rect = pg.Rect(self.pos, self.size)
         pg.draw.rect(self.handler.surface,
@@ -223,7 +223,7 @@ class Entry:
                      rect)
 
         text_surface = self.handler.font.render(
-            self.text, True, (0, 100, 0))
+            self.text, True, text_colour)
         self.handler.surface.blit(text_surface,
                                   (self.pos[0] + ENTRY_SIDE_WIDTH,
                                    self.pos[1]))
