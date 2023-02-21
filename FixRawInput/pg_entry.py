@@ -31,6 +31,7 @@ def get_n_good_colours(n):
     random.shuffle(colours)
     return colours
 
+
 class Entry:
     """
     features
@@ -62,7 +63,8 @@ class Entry:
     """
 
     def __init__(self, handler: type(Controller)):
-        self.handler = handler
+        self.handler: Controller = handler
+        self.handler.entries.append(self)
 
         self.background_colour = (0, 0, 0)
 
@@ -71,10 +73,9 @@ class Entry:
 
         self.pos: tuple[int, int] = (0, 0)
         self.size: tuple[int, int] = (0, 0)
+        self.update_size()
 
         self.delta_drag_start: tuple[int, int] | None = None
-
-        self.paring = None
 
         self.save_state = None
         self.checkpoint()
@@ -83,11 +84,14 @@ class Entry:
         self.handler.entries.remove(self)
 
     def focus(self):
-        self.handler.fucus(self)
+        self.handler.focus(self)
 
     @property
     def has_focus(self):
-        return self.handler.fucus == self
+        return self.handler.focus == self
+
+    def update_size(self):
+        self.size = self.handler.font.size(self.text)
 
     # <editor-fold desc="savestate">
     def checkpoint(self):
@@ -123,8 +127,17 @@ class Entry:
 
     def drag(self, pos):
         if self.delta_drag_start is not None:
-            self.pos = (pos[0] + self.delta_drag_start[0],
-                        pos[1] + self.delta_drag_start[1])
+            self.pos = (pos[0] - self.delta_drag_start[0],
+                        pos[1] - self.delta_drag_start[1])
+
+    def handle_text(self, event):
+        character = event.unicode
+        if character.isprintable() and character != '':
+            self.text += character
+            self.update_size()
+        if event.key == pg.K_BACKSPACE:
+            self.text = self.text[:-1]
+            self.update_size()
 
     def handle_event(self, event):
         def handle_drag_event():
@@ -144,15 +157,17 @@ class Entry:
 
                 self.delta_drag_start = None
 
-            else:
-                self.drag(event.pos)
-
         shift = pg.key.get_mods() & pg.KMOD_SHIFT
         ctrl = pg.key.get_mods() & pg.KMOD_CTRL
 
         # might cause problem
-        if event.button == 3:  # right click
-            handle_drag_event()
+        if event.type in (pg.MOUSEBUTTONDOWN,
+                          pg.MOUSEBUTTONUP):
+            if event.button == 3:  # right click
+                handle_drag_event()
+
+        if pg.mouse.get_pressed()[2]:
+            self.drag(event.pos)
 
         if event.type == pg.KEYDOWN:
             if ctrl:
@@ -162,8 +177,10 @@ class Entry:
                 if event.key == pg.K_z:
                     self.load_checkpoint()
 
-            if event.key == pg.K_d:
-                self.split()
+                if event.key == pg.K_d:
+                    self.split()
+            else:
+                self.handle_text(event)
 
             if event.key == pg.K_DELETE:
                 self.delete()
@@ -171,6 +188,26 @@ class Entry:
         if event.type == pg.MOUSEBUTTONDOWN:
             if event.button == 2:  # middle click
                 self.delete()
+
+    def draw(self):
+        def apply_tint(colour):
+            pass
+
+        if self in self.handler.non_pairs:
+            apply_tint("red")
+
+        if self.has_focus:
+            apply_tint("blue")
+            print(self)
+
+        rect = pg.Rect(self.pos, self.size)
+        pg.draw.rect(self.handler.surface,
+                     self.background_colour,
+                     rect)
+
+        text_surface = self.handler.font.render(
+            self.text, True, (0, 100, 0))
+        self.handler.surface.blit(text_surface, self.pos)
 
 
 class Controller:
@@ -195,7 +232,7 @@ class Controller:
 
     """
 
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         # singleton
         if not hasattr(cls, 'instance'):
             cls.instance = super(Controller, cls).__new__(cls)
@@ -203,14 +240,18 @@ class Controller:
         # f u pycharm
         return cls.instance
 
-    def __init__(self):
+    def __init__(self, surface):
+        self.surface: pg.Surface = surface
+        self.font: pg.font = pg.font.SysFont('Comic Sans MS', 30)
+
         self.focused_entry: Entry | None = None
 
-        self.show_entries = True
-
-        self.pairs = []
+        self.pairs: list[list[Entry, Entry]] = []
+        self.non_pairs: list[Entry] = []
 
         self.entries: list[Entry] = []
+
+        self.show_entries = True
 
     def over_entries(self, pos):
         over = []
@@ -243,48 +284,45 @@ class Controller:
         """
         gives etch entry pair a unique colour
         """
-        pairs = 0
-        for entry in self.entries:
-            if entry.paring is not None:
-                pairs += 0.5  # only half of the pair
 
         # entries with no paring counts sa its own pair
-        entry_pairs = len(self.entries) - int(pairs)
+        entry_pairs = len(self.pairs) + len(self.non_pairs)
 
-        uncoloured_entries = self.entries
+        for colour, pair in zip(
+                get_n_good_colours(entry_pairs),
+                self.pairs + [[entry] for entry in self.non_pairs]):
+            for entry in pair:
+                entry.background_colour = colour
 
-        for colour in get_n_good_colours(entry_pairs):
-            if not len(uncoloured_entries):
-                pair_start = uncoloured_entries[0]
-                uncoloured_entries.pop(0)
-
-                pair_start.background_colour = colour
-                if pair_start.paring is not None:
-                    pair_start.paring.background_colour = colour
-                    uncoloured_entries.remove(pair_start.paring)
     # </editor-fold>
 
-    def handle_events(self):
-        for event in pg.event.get():
+    def handle_event(self, event):
+        if event.type == pg.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                over = self.over_entries(event.pos)
+                if over:
+                    self.focus(over[0])
+
+        if self.focused_entry is not None:
             self.focused_entry.handle_event(event)
 
-            if event.type == pg.KEYDOWN:
-                if pg.key.get_mods() & pg.KMOD_CTRL:
-                    # hide entries
-                    if event.key == pg.K_q:
-                        self.show_entries = False
-                    # unique background
-                    if event.key == pg.K_w:
-                        self.unique_background()
-                    # pair background
-                    if event.key == pg.K_e:
-                        self.pair_background()
-
-            if event.type == pg.KEYUP:
+        if event.type == pg.KEYDOWN:
+            if pg.key.get_mods() & pg.KMOD_CTRL:
+                # hide entries
                 if event.key == pg.K_q:
-                    self.show_entries = True
-                if event.key in (pg.K_w, pg.K_e, pg.K_LCTRL, pg.K_RCTRL):
-                    self.default_background()
+                    self.show_entries = False
+                # unique background
+                if event.key == pg.K_w:
+                    self.unique_background()
+                # pair background
+                if event.key == pg.K_e:
+                    self.pair_background()
+
+        if event.type == pg.KEYUP:
+            if event.key == pg.K_q:
+                self.show_entries = True
+            if event.key in (pg.K_w, pg.K_e, pg.K_LCTRL, pg.K_RCTRL):
+                self.default_background()
 
     # <editor-fold desc="pair handling">
     def get_connections(self):
@@ -383,11 +421,8 @@ class Controller:
         return tr_pairs, non_pairs
 
     def update_pairs(self):
-        """
-        updates
-        """
+        self.pairs, self.non_pairs = self.get_pairs()
     # </editor-fold>
-
 
     def draw(self):
         def draw_connections():
@@ -397,3 +432,29 @@ class Controller:
             draw_connections()
             for entry in self.entries:
                 entry.draw()
+
+
+pg.init()
+
+screen = pg.display.set_mode([500, 500])
+cont = Controller(screen)
+entry = Entry(cont)
+entry.text = "hello"
+entry.update_size()
+clock = pg.time.Clock()
+
+running = True
+while running:
+
+    for event in pg.event.get():
+        cont.handle_event(event)
+        if event.type == pg.QUIT:
+            running = False
+
+    screen.fill((255, 255, 255))
+    entry.draw()
+
+    pg.display.flip()
+    clock.tick(60)
+
+pg.quit()
