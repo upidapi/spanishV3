@@ -6,6 +6,7 @@ import random
 import pygame as pg
 
 DEFAULT_BG = (255, 255, 255)
+ENTRY_SIDE_WIDTH = 5
 
 
 def get_n_good_colours(n):
@@ -84,6 +85,10 @@ class Entry:
         self.save_state = None
         self.checkpoint()
 
+    @property
+    def has_focus(self):
+        return self.handler.focus == self
+
     def delete(self):
         self.handler.entries.remove(self)
         self.handler.un_focus(self)
@@ -91,18 +96,16 @@ class Entry:
     def focus(self):
         self.handler.focus(self)
 
-    @property
-    def has_focus(self):
-        return self.handler.focus == self
-
     def update_size(self):
-        self.size = self.handler.font.size(self.text)
+        w, h = self.handler.font.size(self.text)
+        w += ENTRY_SIDE_WIDTH * 2
+        self.size = w, h
 
     # <editor-fold desc="savestate">
     def checkpoint(self):
         a = vars(self)
         del a["save_state"]
-        self.save_state = a
+        self.save_state = a.copy()
 
     def load_checkpoint(self):
         for key in self.save_state.keys():
@@ -124,16 +127,12 @@ class Entry:
         other.o_text += self.o_text
 
         other.focus()
+        other.update_size()
         self.delete()
 
     def split(self):
         # I have to implement the cursor first
         raise NotImplementedError(".split is not yet implemented")
-
-    def drag(self, pos):
-        if self.delta_drag_start is not None:
-            self.pos = (pos[0] - self.delta_drag_start[0],
-                        pos[1] - self.delta_drag_start[1])
 
     def handle_text(self, event):
         character = event.unicode
@@ -144,35 +143,48 @@ class Entry:
             self.text = self.text[:-1]
             self.update_size()
 
-    def handle_event(self, event):
-        def handle_drag_event():
-            if event.type == pg.MOUSEBUTTONDOWN:
+    # <editor-fold desc="drag">
+    def start_drag(self):
+        self.handler.dragged_entry = self
+        self.delta_drag_start = \
+            (event.pos[0] - self.pos[0],
+             event.pos[1] - self.pos[1])
+
+    def drag(self, pos):
+        if self.delta_drag_start is not None:
+            self.pos = (pos[0] - self.delta_drag_start[0],
+                        pos[1] - self.delta_drag_start[1])
+    # </editor-fold>
+
+    def handle_drag_event(self, event):
+        shift = pg.key.get_mods() & pg.KMOD_SHIFT
+
+        if event.type == pg.MOUSEBUTTONDOWN:
+            if event.button == 3:
+                self.handler.handle_drag_event = self
                 self.delta_drag_start = \
                     (event.pos[0] - self.pos[0],
                      event.pos[1] - self.pos[1])
-            elif event.type == pg.MOUSEBUTTONUP:
+
+        elif event.type == pg.MOUSEBUTTONUP:
+            if event.button == 3:
                 if shift:
                     over = self.handler.over_entries(event.pos)
-                    over.remove(self)   # might cause problem
+                    over.remove(self)  # might cause problem
 
                     if len(over):
                         merge_with = over[0]
 
                         self.merge(merge_with)
 
-                self.delta_drag_start = None
+                self.handler.dragged_entry = None
 
-        shift = pg.key.get_mods() & pg.KMOD_SHIFT
+        elif event.type == pg.MOUSEMOTION:
+            if pg.mouse.get_pressed()[2]:
+                self.drag(pg.mouse.get_pos())
+
+    def handle_event(self, event):
         ctrl = pg.key.get_mods() & pg.KMOD_CTRL
-
-        # might cause problem
-        if event.type in (pg.MOUSEBUTTONDOWN,
-                          pg.MOUSEBUTTONUP):
-            if event.button == 3:  # right click
-                handle_drag_event()
-
-        if pg.mouse.get_pressed()[2]:
-            self.drag(pg.mouse.get_pos())
 
         if event.type == pg.KEYDOWN:
             if ctrl:
@@ -190,9 +202,9 @@ class Entry:
             if event.key == pg.K_DELETE:
                 self.delete()
 
-        if event.type == pg.MOUSEBUTTONDOWN:
-            if event.button == 2:  # middle click
-                self.delete()
+        # if event.type == pg.MOUSEBUTTONDOWN:
+        #     if event.button == 2:  # middle click
+        #         self.delete()
 
     def draw(self):
         def apply_tint(colour):
@@ -212,7 +224,9 @@ class Entry:
 
         text_surface = self.handler.font.render(
             self.text, True, (0, 100, 0))
-        self.handler.surface.blit(text_surface, self.pos)
+        self.handler.surface.blit(text_surface,
+                                  (self.pos[0] + ENTRY_SIDE_WIDTH,
+                                   self.pos[1]))
 
 
 class Controller:
@@ -250,6 +264,7 @@ class Controller:
         self.font: pg.font = pg.font.SysFont('Comic Sans MS', 30)
 
         self.focused_entry: Entry | None = None
+        self.dragged_entry: Entry | None = None
 
         self.pairs: list[list[Entry, Entry]] = []
         self.non_pairs: list[Entry] = []
@@ -274,6 +289,7 @@ class Controller:
     def change_lan(self):
         for entry in self.entries:
             entry.text, entry.o_text = entry.o_text, entry.text
+            entry.update_size()
 
     # <editor-fold desc="change backgrounds">
     def default_background(self):
@@ -306,8 +322,17 @@ class Controller:
 
     def handle_event(self, event):
         if event.type == pg.MOUSEBUTTONDOWN:
+            pass
+
+        if self.focused_entry is not None:
+            self.focused_entry.handle_event(event)
+
+        if self.dragged_entry is not None:
+            self.dragged_entry.handle_drag_event(event)
+
+        if event.type == pg.MOUSEBUTTONDOWN:
             over = self.over_entries(event.pos)
-            if event.button == 1:
+            if event.button == 1:  # focus
                 if over:
                     self.focus(over[0])
             if event.button == 2:  # create/remove entry
@@ -316,9 +341,9 @@ class Controller:
                 else:
                     entry = Entry(self, pos=event.pos)
                     entry.focus()
-
-        if self.focused_entry is not None:
-            self.focused_entry.handle_event(event)
+            if event.button == 3:  # drag
+                if over:
+                    over[0].start_drag()
 
         if event.type == pg.KEYDOWN:
             if pg.key.get_mods() & pg.KMOD_CTRL:
@@ -331,6 +356,9 @@ class Controller:
                 # pair background
                 if event.key == pg.K_e:
                     self.pair_background()
+                # change lan
+                if event.key == pg.K_r:
+                    self.change_lan()
 
         if event.type == pg.KEYUP:
             if event.key == pg.K_q:
