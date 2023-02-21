@@ -172,7 +172,7 @@ class Entry:
                 handle_drag_event()
 
         if pg.mouse.get_pressed()[2]:
-            self.drag(event.pos)
+            self.drag(pg.mouse.get_pos())
 
         if event.type == pg.KEYDOWN:
             if ctrl:
@@ -404,34 +404,26 @@ class Controller:
         data.sort(key=lambda x: x.pos[0])  # sort by x pos
         while 0 < len(data):
             # a start that is guarantied to not have multiple things before it
-            current_point = data.pop(0)
+            current_point = data[0]
 
             # all pairs with "current_point" included
             cn_pairs = connects_to(current_point)
 
             if not len(cn_pairs):
+                data.pop(0)
                 non_pairs.append(current_point)
                 continue
 
-            best_cn = cn_pairs.pop(0)
+            cn_pairs.sort(key=lambda x: x[0].pos[0] if x[1] == current_point else x[1].pos[0])
+            best_cn = cn_pairs[0]
 
-            for cn_pair in cn_pairs[1:]:
-                # don't reference a paired line
-                possible_pairs.remove(cn_pair)
-
-                connection = cn_pair[0] if cn_pair[1] == current_point else cn_pair[1]
-                if connection.pos[0] < best_cn.pos[0]:
-                    best_cn = connection
+            data.remove(best_cn[0])
+            data.remove(best_cn[1])
 
             tr_pairs.append(best_cn)
-            if best_cn in data:
-                data.remove(best_cn)
 
-            # don't reference a paired line
-            best_cn_cns = connects_to(best_cn)
-
-            for best_cn_cn in best_cn_cns:
-                possible_pairs.remove(best_cn_cn)
+            possible_pairs = [possible_pair for possible_pair in possible_pairs
+                              if not any(entry in possible_pair for entry in best_cn)]
 
         return tr_pairs, non_pairs
 
@@ -472,7 +464,7 @@ class Controller:
                     s = pg.Surface(size)  # the size of your rect
                     s.set_alpha(255)  # alpha level
                     s.fill((255, 255, 255))  # this fills the entire surface
-                    self.surface.blit(s, pos)
+                    image.blit(s, pos)
 
                 remove_colour(a_rel, a.size)
                 remove_colour(b_rel, b.size)
