@@ -65,16 +65,18 @@ class Entry:
 
     def __init__(self,
                  handler: type(Controller),
-                 text: str = "",
                  pos: tuple[int, int] = (0, 0),
+                 text: str = "",
+                 o_text: str = "",
                  ):
+
         self.handler: Controller = handler
         self.handler.entries.append(self)
 
         self.background_colour = DEFAULT_BG
 
         self.text: str = text
-        self.o_text: str = ""
+        self.o_text: str = o_text
 
         self.pos: tuple[int, int] = pos
         self.size: tuple[int, int] = (0, 0)
@@ -231,6 +233,8 @@ class Entry:
 
 class Controller:
     """
+    Handles the entries.
+
     singleton
 
     features
@@ -507,28 +511,3 @@ class Controller:
                 entry.draw()
 
 
-pg.init()
-
-screen = pg.display.set_mode([500, 500])
-cont = Controller(screen)
-
-for x in range(10):
-    Entry(cont, str(x), (10, x*50))
-
-clock = pg.time.Clock()
-
-running = True
-while running:
-
-    for event in pg.event.get():
-        cont.handle_event(event)
-        if event.type == pg.QUIT:
-            running = False
-
-    screen.fill((255, 255, 255))
-    cont.draw()
-
-    pg.display.flip()
-    clock.tick(60)
-
-pg.quit()
