@@ -46,18 +46,19 @@ class Handler:
             self.merge_pairs()
             return
 
-    def next_frame(self):
-        for event in pg.event.get():
+    def compute_frame(self, events):
+        for event in events:
             self.controller.handle_event(event)
             if pg.key.get_mods() & pg.KMOD_CTRL:
                 if pg.key == pg.K_RETURN:
                     self.next_mode()
 
-        self.screen.fill((0, 255, 255))
+        self.screen.fill((255, 255, 255))
 
-        self.controller.draw_entries()
+        if self.controller.show_entries:
+            self.controller.draw_entries()
 
-        if self.mode == 0:
-            self.controller.draw_connections()
+            if self.mode == 0:
+                self.controller.draw_connections()
 
         pg.display.flip()

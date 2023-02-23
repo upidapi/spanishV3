@@ -104,6 +104,29 @@ class Entry:
         w += ENTRY_SIDE_WIDTH * 2
         self.size = w, h
 
+    def update_pos(self):
+        """
+        keeps the entry inside the screen
+        """
+
+        self.pos = (
+            max(0, self.pos[0]),
+            max(0, self.pos[1])
+        )
+
+        screen_size = self.handler.surface.get_size()
+
+        to_right_side = screen_size[0] - (self.pos[0] + self.size[0])
+        to_bottom_side = screen_size[1] - (self.pos[1] + self.size[1])
+
+        move_left = min(0, to_right_side)
+        move_up = min(0, to_bottom_side)
+
+        self.pos = (
+            self.pos[0] + move_left,
+            self.pos[1] + move_up
+        )
+
     # <editor-fold desc="savestate">
     def checkpoint(self):
         a = vars(self)
@@ -217,10 +240,10 @@ class Entry:
         if self.has_focus:
             text_colour = (0, 255, 0)
 
-        # rect = pg.Rect(self.pos, self.size)
-        # pg.draw.rect(self.handler.surface,
-        #              self.background_colour,
-        #              rect)
+        rect = pg.Rect(self.pos, self.size)
+        pg.draw.rect(self.handler.surface,
+                     self.background_colour,
+                     rect)
 
         text_surface = self.handler.font.render(
             self.text, True, text_colour)
@@ -260,6 +283,7 @@ class Controller:
             cls.instance = super(Controller, cls).__new__(cls)
 
         # f u pycharm
+        # noinspection PyUnresolvedReferences
         return cls.instance
 
     def __init__(self, surface):
@@ -510,8 +534,17 @@ class Controller:
                                min(a.pos[1], b.pos[1])))
 
     def draw_entries(self):
+        for entry in self.entries:
+            entry.update_pos()
+
         self.update_pairs()
 
-        if self.show_entries:
-            for entry in self.entries:
-                entry.draw()
+        for entry in self.entries:
+            entry.draw()
+
+
+# todo optimize when Entry.update_pos() gets called
+
+# todo actually implement the entry part of Entry
+
+# todo implement Entry.split()

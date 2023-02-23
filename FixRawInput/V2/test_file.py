@@ -10,10 +10,21 @@ screen = pg.display.set_mode([500, 500])
 
 handler = Handler(screen, ("swe", "spa"))
 
+abc = "abcdefghijklmnop"
 for x in range(10):
-    Entry(handler.controller, text=str(x), pos=(10, x*50))
+    Entry(handler.controller,
+          text=str(x),
+          o_text=abc[x],
+          pos=(10, x*50))
 
-while True:
-    handler.next_frame()
+running = True
+while running:
+    events = pg.event.get()
+
+    for event in events:
+        if event.type == pg.QUIT:
+            running = False
+
+    handler.compute_frame(events)
 
     clock.tick(60)
