@@ -61,17 +61,17 @@ class Entry:
             force save
                 ctrl + s
             revert changes (load savestate) if user preses "esc"
-            not ctrl + esc (handled by Controller)
+            not ctrl + esc (handled by Handler)
     """
 
     def __init__(self,
-                 handler: type(Controller),
+                 handler: type(Handler),
                  pos: tuple[int, int] = (0, 0),
                  text: str = "",
                  o_text: str = "",
                  ):
 
-        self.handler: Controller = handler
+        self.handler: Handler = handler
         self.handler.entries.append(self)
 
         self.background_colour = DEFAULT_BG
@@ -94,7 +94,9 @@ class Entry:
 
     def delete(self):
         self.handler.entries.remove(self)
-        self.un_focus()
+        # can't do anything with a deleted entry
+        if self.has_focus:
+            self.handler.focused_entry = None
 
     def focus(self):
         self.handler.focus(self)
@@ -264,7 +266,7 @@ class Entry:
                                    self.pos[1]))
 
 
-class Controller:
+class Handler:
     """
     Handles the entries.
 
@@ -291,7 +293,7 @@ class Controller:
     def __new__(cls, *args, **kwargs):
         # singleton
         if not hasattr(cls, 'instance'):
-            cls.instance = super(Controller, cls).__new__(cls)
+            cls.instance = super(Handler, cls).__new__(cls)
 
         # f u pycharm
         # noinspection PyUnresolvedReferences
@@ -379,6 +381,7 @@ class Controller:
                     over[0].delete()
                 else:
                     entry = Entry(self, pos=event.pos)
+                    entry.pos = (entry.pos[0], entry.pos[1] - entry.size[1] // 2)
                     entry.focus()
             if event.button == 3:  # drag
                 if over:
@@ -545,6 +548,8 @@ class Controller:
 
 
 # todo optimize when Entry.update_pos() gets called
+
+# todo optimize when Handler.get_pairs() gets called
 
 # todo actually implement the entry part of Entry
 

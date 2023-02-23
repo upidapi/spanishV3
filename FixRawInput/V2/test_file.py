@@ -1,14 +1,14 @@
 import pygame as pg
 
 from FixRawInput.V2.Entry import Entry
-from FixRawInput.V2.Handler import Handler
+from FixRawInput.V2.Controller import Controller
 
 pg.init()
 
 clock = pg.time.Clock()
 screen = pg.display.set_mode([1000, 1000])
 
-handler = Handler(screen, ("swe", "spa"))
+controller = Controller(screen, ("swe", "spa"))
 
 # abc = "abcdefghijklmnop"
 # for x in range(10):
@@ -35,6 +35,6 @@ while running:
     # stats.sort_stats(pstats.SortKey.TIME)
     # stats.print_stats()
 
-    handler.compute_frame(events)
+    controller.compute_frame(events)
 
     clock.tick(60)

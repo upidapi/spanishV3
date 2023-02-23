@@ -1,16 +1,16 @@
 """
-controls the controller
+controls the handler
 """
 
 import pygame as pg
 
 from Data import load_raw_data
-from FixRawInput.V2.Entry import Controller, Entry
+from FixRawInput.V2.Entry import Handler, Entry
 
 
-class Handler:
+class Controller:
     def __init__(self, screen, lan_s: tuple[str, str]):
-        self.controller = Controller(screen)
+        self.handler = Handler(screen)
 
         self.screen = screen
 
@@ -31,20 +31,20 @@ class Handler:
             text_1, text_2 = d1['text'], d2['text']
             pos = d1['x'], d1['y']
 
-            Entry(self.controller, pos=pos, text=text_1, o_text=text_2)
+            Entry(self.handler, pos=pos, text=text_1, o_text=text_2)
 
     def merge_pairs(self):
-        self.mode = 1
+        if not self.handler.non_pairs:
+            if not self.handler.primary_lan:
+                self.handler.change_lan()
 
-        if not self.controller.non_pairs:
-            if not self.controller.primary_lan:
-                self.controller.change_lan()
-
-            for pair in self.controller.pairs:
+            for pair in self.handler.pairs:
                 pair.sort(key=lambda x: x.pos[0])
 
                 pair[0].o_text = pair[0].text
                 pair[1].text = pair[1].o_text
+
+            self.mode = 1
 
     def next_mode(self):
         if self.mode == 0:
@@ -53,17 +53,18 @@ class Handler:
 
     def compute_frame(self, events):
         for event in events:
-            self.controller.handle_event(event)
-            if pg.key.get_mods() & pg.KMOD_CTRL:
-                if pg.key == pg.K_RETURN:
-                    self.next_mode()
+            self.handler.handle_event(event)
+            if event.type == pg.KEYDOWN:
+                if pg.key.get_mods() & pg.KMOD_CTRL:
+                    if event.key == pg.K_RETURN:
+                        self.next_mode()
 
         self.screen.blit(self.background, (0, 0))
 
-        if self.controller.show_entries:
-            self.controller.draw_entries()
+        if self.handler.show_entries:
+            self.handler.draw_entries()
 
             if self.mode == 0:
-                self.controller.draw_connections()
+                self.handler.draw_connections()
 
         pg.display.flip()
