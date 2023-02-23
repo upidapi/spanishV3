@@ -94,10 +94,15 @@ class Entry:
 
     def delete(self):
         self.handler.entries.remove(self)
-        self.handler.un_focus()
+        self.un_focus()
 
     def focus(self):
         self.handler.focus(self)
+
+    def un_focus(self):
+        self.handler.focused_entry = None
+        if len(self.text) + len(self.o_text) == 0:
+            self.delete()
 
     def update_size(self):
         w, h = self.handler.font.size(self.text)
@@ -223,6 +228,12 @@ class Entry:
                 if event.key == pg.K_d:
                     self.split()
             else:
+                if event.key == pg.K_ESCAPE:
+                    self.load_checkpoint()
+                    self.un_focus()
+                if event.key == pg.K_RETURN:
+                    self.un_focus()
+
                 self.handle_text(event)
 
             if event.key == pg.K_DELETE:
@@ -288,7 +299,7 @@ class Controller:
 
     def __init__(self, surface):
         self.surface: pg.Surface = surface
-        self.font: pg.font = pg.font.SysFont('Comic Sans MS', 8)
+        self.font: pg.font = pg.font.SysFont('Comic Sans MS', 14)
 
         self.primary_lan = True  # if lan is switched or not
         self.focused_entry: Entry | None = None
@@ -309,10 +320,9 @@ class Controller:
         return over
 
     def focus(self, entry):
+        if self.focused_entry is not None:
+            self.focused_entry.un_focus()
         self.focused_entry = entry
-
-    def un_focus(self):
-        self.focused_entry = None
 
     def change_lan(self):
         self.primary_lan = not self.primary_lan
@@ -454,11 +464,11 @@ class Controller:
         connections = self.get_con()
 
         while len(indexed) < len(self.entries):
-            current = max(connections.keys(), key=lambda x: x.pos[0])
+            current = min(connections.keys(), key=lambda x: x.pos[0])
             available_connections = connections[current] - indexed
 
             if available_connections:
-                best_connection = max(available_connections, key=lambda x: x.pos[0])
+                best_connection = min(available_connections, key=lambda x: x.pos[0])
                 pairs.append((current, best_connection))
 
                 indexed.add(best_connection)
@@ -470,94 +480,6 @@ class Controller:
             del connections[current]
 
         return pairs, non_pairs
-
-    # def get_connections(self):
-    #     entries = self.entries.copy()
-    #     entries.sort(key=lambda x: x.pos[1])  # sort by y pos
-    #
-    #     margins = 1
-    #
-    #     """
-    #     the percentage you remove from the entry
-    #     0 -> the entry has to overlap with the hotbox
-    #     0.5 -> half the entry has to overlap
-    #     1 -> the center has to overlap
-    #     2 -> the whole lines has to be inside
-    #     """
-    #
-    #     pairs = []
-    #     indexed = []
-    #     for entry in entries:
-    #         y = entry.pos[1]
-    #         height = entry.size[1]
-    #         """
-    #         decreases the entry "size" by size * margins
-    #         top_line
-    #             y + height * margins / 2
-    #
-    #         bottom_line
-    #             y + height - height * margins / 2
-    #             =>
-    #             y + height(1 - * margins  / 2)
-    #         """
-    #
-    #         bottom_line = y + height * margins / 2
-    #         top_line = y + height * (1 - margins / 2)
-    #
-    #         for j, indexed_entry in enumerate(indexed):
-    #             # if the top or bottom of the hit-box collides
-    #             i_y = indexed_entry.pos[1]
-    #             i_height = indexed_entry.size[1]
-    #             top_hit_box, bottom_hit_box = i_y, i_y + i_height
-    #             if top_hit_box <= bottom_line <= bottom_hit_box or \
-    #                     top_hit_box <= top_line <= bottom_hit_box:
-    #                 pairs.append((indexed_entry, entry))
-    #
-    #         indexed.append(entry)
-    #
-    #     return pairs
-    #
-    # def get_pairs(self):
-    #     def connects_to(x):
-    #         x_cn_to = []
-    #         for pair in possible_pairs:
-    #             if x in pair:
-    #                 x_cn_to.append(pair)
-    #
-    #         return x_cn_to
-    #
-    #     data = self.entries.copy()
-    #
-    #     possible_pairs = self.get_connections()
-    #
-    #     tr_pairs: list[tuple[Entry, Entry]] = []
-    #     non_pairs = []
-    #
-    #     data.sort(key=lambda x: x.pos[0])  # sort by x pos
-    #     while 0 < len(data):
-    #         # a start that is guarantied to not have multiple things before it
-    #         current_point = data[0]
-    #
-    #         # all pairs with "current_point" included
-    #         cn_pairs = connects_to(current_point)
-    #
-    #         if not len(cn_pairs):
-    #             data.pop(0)
-    #             non_pairs.append(current_point)
-    #             continue
-    #
-    #         cn_pairs.sort(key=lambda x: x[0].pos[0] if x[1] == current_point else x[1].pos[0])
-    #         best_cn = cn_pairs[0]
-    #
-    #         data.remove(best_cn[0])
-    #         data.remove(best_cn[1])
-    #
-    #         tr_pairs.append(best_cn)
-    #
-    #         possible_pairs = [possible_pair for possible_pair in possible_pairs
-    #                           if not any(entry in possible_pair for entry in best_cn)]
-    #
-    #     return tr_pairs, non_pairs
 
     def update_pairs(self):
         self.pairs, self.non_pairs = self.get_pairs()
@@ -610,12 +532,15 @@ class Controller:
                                min(a.pos[1], b.pos[1])))
 
     def draw_entries(self):
+
         for entry in self.entries:
             entry.update_pos()
 
         self.update_pairs()
 
-        for entry in self.entries:
+        rev_order = self.entries.copy()
+        rev_order.reverse()
+        for entry in rev_order:
             entry.draw()
 
 

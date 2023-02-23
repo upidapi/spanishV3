@@ -13,7 +13,8 @@ class Handler:
         self.controller = Controller(screen)
 
         self.screen = screen
-        # self.clock = clock
+
+        self.background = pg.image.load(r'../../Data/DataFiles/selected_image.jpg')
 
         self.lan_s = lan_s
 
@@ -57,7 +58,7 @@ class Handler:
                 if pg.key == pg.K_RETURN:
                     self.next_mode()
 
-        self.screen.fill((255, 255, 255))
+        self.screen.blit(self.background, (0, 0))
 
         if self.controller.show_entries:
             self.controller.draw_entries()

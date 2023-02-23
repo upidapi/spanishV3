@@ -158,6 +158,7 @@ def load_clean_data():
 
 
 def load_raw_data():
+
     def _get_data(file):
         # gets the New
         with open(file) as jsonFile:
@@ -166,7 +167,7 @@ def load_raw_data():
 
         return json_object
 
-    data_1 = _get_data(r'C:\Users\upidapi\PycharmProjects\spanishV3\Data\DataFiles\lan1_data.json')
-    data_2 = _get_data(r'C:\Users\upidapi\PycharmProjects\spanishV3\Data\DataFiles\lan1_data.json')
+    data_1 = _get_data(r'../../Data/DataFiles/lan1_data.json')
+    data_2 = _get_data(r'../../Data/DataFiles/lan2_data.json')
 
     return data_1, data_2
