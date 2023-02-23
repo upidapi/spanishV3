@@ -4,6 +4,7 @@ import math
 import random
 
 import pygame as pg
+from PIL import Image, ImageDraw
 
 DEFAULT_BG = (255, 255, 255)
 ENTRY_SIDE_WIDTH = 5
@@ -93,7 +94,7 @@ class Entry:
 
     def delete(self):
         self.handler.entries.remove(self)
-        self.handler.un_focus(self)
+        self.handler.un_focus()
 
     def focus(self):
         self.handler.focus(self)
@@ -146,11 +147,11 @@ class Entry:
             self.update_size()
 
     # <editor-fold desc="drag">
-    def start_drag(self):
+    def start_drag(self, pos):
         self.handler.dragged_entry = self
         self.delta_drag_start = \
-            (event.pos[0] - self.pos[0],
-             event.pos[1] - self.pos[1])
+            (pos[0] - self.pos[0],
+             pos[1] - self.pos[1])
 
     def drag(self, pos):
         if self.delta_drag_start is not None:
@@ -209,9 +210,6 @@ class Entry:
         #         self.delete()
 
     def draw(self):
-        def apply_tint(colour):
-            pass
-
         text_colour = (0, 0, 0)
         if self in self.handler.non_pairs:
             text_colour = (255, 0, 0)
@@ -219,13 +217,14 @@ class Entry:
         if self.has_focus:
             text_colour = (0, 255, 0)
 
-        rect = pg.Rect(self.pos, self.size)
-        pg.draw.rect(self.handler.surface,
-                     self.background_colour,
-                     rect)
+        # rect = pg.Rect(self.pos, self.size)
+        # pg.draw.rect(self.handler.surface,
+        #              self.background_colour,
+        #              rect)
 
         text_surface = self.handler.font.render(
             self.text, True, text_colour)
+
         self.handler.surface.blit(text_surface,
                                   (self.pos[0] + ENTRY_SIDE_WIDTH,
                                    self.pos[1]))
@@ -267,6 +266,7 @@ class Controller:
         self.surface: pg.Surface = surface
         self.font: pg.font = pg.font.SysFont('Comic Sans MS', 30)
 
+        self.primary_lan = True  # if lan is switched or not
         self.focused_entry: Entry | None = None
         self.dragged_entry: Entry | None = None
 
@@ -287,10 +287,11 @@ class Controller:
     def focus(self, entry):
         self.focused_entry = entry
 
-    def un_focus(self, entry):
+    def un_focus(self):
         self.focused_entry = None
 
     def change_lan(self):
+        self.primary_lan = not self.primary_lan
         for entry in self.entries:
             entry.text, entry.o_text = entry.o_text, entry.text
             entry.update_size()
@@ -347,7 +348,7 @@ class Controller:
                     entry.focus()
             if event.button == 3:  # drag
                 if over:
-                    over[0].start_drag()
+                    over[0].start_drag(pg.mouse.get_pos())
 
         if event.type == pg.KEYDOWN:
             if pg.key.get_mods() & pg.KMOD_CTRL:
@@ -463,51 +464,54 @@ class Controller:
         self.pairs, self.non_pairs = self.get_pairs()
     # </editor-fold>
 
-    def draw(self):
+    def draw_connections(self):
+        for a, b in self.pairs:
+            if a.pos[0] > b.pos[0]:
+                a, b = b, a
+
+            if a.pos[1] < b.pos[1]:
+                # a over b
+                a_rel = 0, 0
+                b_rel = b.pos[0] - a.pos[0], b.pos[1] - a.pos[1]
+            else:
+                # a under b
+                a_rel = 0, a.pos[1] - b.pos[1]
+                b_rel = b.pos[0] - a.pos[0], 0
+
+            image_size = (b.pos[0] - a.pos[0] + b.size[0],
+                          abs(b.pos[1] - a.pos[1]) + b.size[1])
+
+            image = Image.new(mode="RGBA",
+                              size=image_size)
+            draw = ImageDraw.Draw(image)
+
+            from_pos = (a_rel[0] + a.size[0] / 2,
+                        a_rel[1] + a.size[1] / 2)
+            to_pos = (b_rel[0] + b.size[0] / 2,
+                      b_rel[1] + b.size[1] / 2)
+
+            draw.line((from_pos, to_pos), fill=(0, 0, 0))
+
+            def remove_colour(pos, rect_size):
+                i = Image.new(mode="RGBA",
+                              size=rect_size)
+                image.paste(i, pos)
+
+            remove_colour(a_rel, a.size)
+            remove_colour(b_rel, b.size)
+
+            size = image.size
+            data = image.tobytes()
+
+            py_image = pg.image.fromstring(data, size, "RGBA")
+
+            self.surface.blit(py_image,
+                              (min(a.pos[0], b.pos[0]),
+                               min(a.pos[1], b.pos[1])))
+
+    def draw_entries(self):
         self.update_pairs()
 
-        def draw_connections():
-            for a, b in self.pairs:
-                if a.pos[0] > b.pos[0]:
-                    a, b = b, a
-
-                if a.pos[1] < b.pos[1]:
-                    # a over b
-                    a_rel = 0, 0
-                    b_rel = b.pos[0] - a.pos[0], b.pos[1] - a.pos[1]
-                else:
-                    # a under b
-                    a_rel = 0, a.pos[1] - b.pos[1]
-                    b_rel = b.pos[0] - a.pos[0], 0
-
-                surface_size = (b.pos[0] - a.pos[0] + b.size[0],
-                                abs(b.pos[1] - a.pos[1]) + b.size[1])
-
-                image = pg.Surface(surface_size, pg.SRCALPHA, 32)
-                image = image.convert_alpha()
-
-                pg.draw.line(image, (0, 0, 0),
-                             (a_rel[0] + a.size[0] / 2,
-                              a_rel[1] + a.size[1] / 2),
-                             (b_rel[0] + b.size[0] / 2,
-                              b_rel[1] + b.size[1] / 2))
-
-                def remove_colour(pos, size):
-                    s = pg.Surface(size)  # the size of your rect
-                    s.set_alpha(255)  # alpha level
-                    s.fill((255, 255, 255))  # this fills the entire surface
-                    image.blit(s, pos)
-
-                remove_colour(a_rel, a.size)
-                remove_colour(b_rel, b.size)
-
-                self.surface.blit(image,
-                                  (min(a.pos[0], b.pos[0]),
-                                   min(a.pos[1], b.pos[1])))
-
         if self.show_entries:
-            draw_connections()
             for entry in self.entries:
                 entry.draw()
-
-

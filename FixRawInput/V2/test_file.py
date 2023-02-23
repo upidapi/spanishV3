@@ -1,27 +1,19 @@
 import pygame as pg
 
+from FixRawInput.V2.Entry import Entry
+from FixRawInput.V2.Handler import Handler
+
 pg.init()
 
+clock = pg.time.Clock()
 screen = pg.display.set_mode([500, 500])
-cont = Controller(screen)
+
+handler = Handler(screen, ("swe", "spa"))
 
 for x in range(10):
-    Entry(cont, str(x), (10, x*50))
+    Entry(handler.controller, text=str(x), pos=(10, x*50))
 
-clock = pg.time.Clock()
+while True:
+    handler.next_frame()
 
-running = True
-while running:
-
-    for event in pg.event.get():
-        cont.handle_event(event)
-        if event.type == pg.QUIT:
-            running = False
-
-    screen.fill((255, 255, 255))
-    cont.draw()
-
-    pg.display.flip()
     clock.tick(60)
-
-pg.quit()
