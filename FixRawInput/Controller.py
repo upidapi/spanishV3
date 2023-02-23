@@ -4,8 +4,8 @@ controls the handler
 
 import pygame as pg
 
-from Data import load_raw_data
-from FixRawInput.V2.Entry import Handler, Entry
+from Data import load_raw_data, save_data
+from FixRawInput.Entry import Handler, Entry
 
 
 class Controller:
@@ -14,7 +14,7 @@ class Controller:
 
         self.screen = screen
 
-        self.background = pg.image.load(r'../../Data/DataFiles/selected_image.jpg')
+        self.background = pg.image.load(r'../Data/DataFiles/selected_image.jpg')
 
         self.lan_s = lan_s
 
@@ -39,16 +39,29 @@ class Controller:
                 self.handler.change_lan()
 
             for pair in self.handler.pairs:
-                pair.sort(key=lambda x: x.pos[0])
+                if pair[0].pos[0] > pair[1].pos[0]:
+                    pair = (pair[1], pair[0])
 
                 pair[0].o_text = pair[0].text
                 pair[1].text = pair[1].o_text
 
             self.mode = 1
 
+    def save_data(self):
+        data_pairs = [
+            [pair[0].text, pair[1].text]
+            for pair in self.handler.pairs
+        ]
+
+        if save_data(data_pairs):
+            self.mode = 2
+
     def next_mode(self):
         if self.mode == 0:
             self.merge_pairs()
+            return
+        if self.mode == 1:
+            self.save_data()
             return
 
     def compute_frame(self, events):

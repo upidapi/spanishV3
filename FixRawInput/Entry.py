@@ -34,6 +34,11 @@ def get_n_good_colours(n):
     return colours
 
 
+class TextEntry:
+    pass
+    # implementation of the text_entry part of the entry
+
+
 class Entry:
     """
     features

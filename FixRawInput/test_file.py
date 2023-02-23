@@ -1,7 +1,6 @@
 import pygame as pg
 
-from FixRawInput.V2.Entry import Entry
-from FixRawInput.V2.Controller import Controller
+from FixRawInput.Controller import Controller
 
 pg.init()
 
