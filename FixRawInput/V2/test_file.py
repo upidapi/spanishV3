@@ -10,12 +10,12 @@ screen = pg.display.set_mode([500, 500])
 
 handler = Handler(screen, ("swe", "spa"))
 
-abc = "abcdefghijklmnop"
-for x in range(10):
-    Entry(handler.controller,
-          text=str(x),
-          o_text=abc[x],
-          pos=(10, x*50))
+# abc = "abcdefghijklmnop"
+# for x in range(10):
+#     Entry(handler.controller,
+#           text=str(x),
+#           o_text=abc[x],
+#           pos=(10, x*50))
 
 running = True
 while running:
@@ -25,6 +25,16 @@ while running:
         if event.type == pg.QUIT:
             running = False
 
-    handler.compute_frame(events)
+    import cProfile
+    import pstats
+
+    with cProfile.Profile() as pr:
+        handler.compute_frame(events)
+
+    stats = pstats.Stats(pr)
+    stats.sort_stats(pstats.SortKey.TIME)
+    stats.print_stats()
+
+    break
 
     clock.tick(60)

@@ -288,7 +288,7 @@ class Controller:
 
     def __init__(self, surface):
         self.surface: pg.Surface = surface
-        self.font: pg.font = pg.font.SysFont('Comic Sans MS', 30)
+        self.font: pg.font = pg.font.SysFont('Comic Sans MS', 8)
 
         self.primary_lan = True  # if lan is switched or not
         self.focused_entry: Entry | None = None
@@ -396,7 +396,8 @@ class Controller:
                 self.default_background()
 
     # <editor-fold desc="pair handling">
-    def get_connections(self):
+
+    def get_con(self):
         entries = self.entries.copy()
         entries.sort(key=lambda x: x.pos[1])  # sort by y pos
 
@@ -410,8 +411,7 @@ class Controller:
         2 -> the whole lines has to be inside
         """
 
-        pairs = []
-        indexed = []
+        pairs = {}
         for entry in entries:
             y = entry.pos[1]
             height = entry.size[1]
@@ -419,7 +419,7 @@ class Controller:
             decreases the entry "size" by size * margins
             top_line
                 y + height * margins / 2
-            
+
             bottom_line
                 y + height - height * margins / 2
                 =>
@@ -429,60 +429,135 @@ class Controller:
             bottom_line = y + height * margins / 2
             top_line = y + height * (1 - margins / 2)
 
-            for j, indexed_entry in enumerate(indexed):
-                # if the top or bottom of the hit-box collides
-                i_y = indexed_entry.pos[1]
-                i_height = indexed_entry.size[1]
-                top_hit_box, bottom_hit_box = i_y, i_y + i_height
+            con_s = []
+
+            for entry_con in entries:
+                if entry_con == entry:
+                    continue
+
+                c_y = entry_con.pos[1]
+                c_height = entry_con.size[1]
+                top_hit_box, bottom_hit_box = c_y, c_y + c_height
                 if top_hit_box <= bottom_line <= bottom_hit_box or \
                         top_hit_box <= top_line <= bottom_hit_box:
-                    pairs.append((indexed_entry, entry))
+                    con_s.append(entry_con)
 
-            indexed.append(entry)
+            pairs[entry] = set(con_s)
 
         return pairs
 
     def get_pairs(self):
-        def connects_to(x):
-            x_cn_to = []
-            for pair in possible_pairs:
-                if x in pair:
-                    x_cn_to.append(pair)
-
-            return x_cn_to
-
-        data = self.entries.copy()
-
-        possible_pairs = self.get_connections()
-
-        tr_pairs: list[tuple[Entry, Entry]] = []
         non_pairs = []
+        pairs = []
 
-        data.sort(key=lambda x: x.pos[0])  # sort by x pos
-        while 0 < len(data):
-            # a start that is guarantied to not have multiple things before it
-            current_point = data[0]
+        indexed = set()
+        connections = self.get_con()
 
-            # all pairs with "current_point" included
-            cn_pairs = connects_to(current_point)
+        while len(indexed) < len(self.entries):
+            current = max(connections.keys(), key=lambda x: x.pos[0])
+            available_connections = connections[current] - indexed
 
-            if not len(cn_pairs):
-                data.pop(0)
-                non_pairs.append(current_point)
-                continue
+            if available_connections:
+                best_connection = max(available_connections, key=lambda x: x.pos[0])
+                pairs.append((current, best_connection))
 
-            cn_pairs.sort(key=lambda x: x[0].pos[0] if x[1] == current_point else x[1].pos[0])
-            best_cn = cn_pairs[0]
+                indexed.add(best_connection)
+                del connections[best_connection]
+            else:
+                non_pairs.append(current)
 
-            data.remove(best_cn[0])
-            data.remove(best_cn[1])
+            indexed.add(current)
+            del connections[current]
 
-            tr_pairs.append(best_cn)
+        return pairs, non_pairs
 
-            possible_pairs = [possible_pair for possible_pair in possible_pairs
-                              if not any(entry in possible_pair for entry in best_cn)]
-
-        return tr_pairs, non_pairs
+    # def get_connections(self):
+    #     entries = self.entries.copy()
+    #     entries.sort(key=lambda x: x.pos[1])  # sort by y pos
+    #
+    #     margins = 1
+    #
+    #     """
+    #     the percentage you remove from the entry
+    #     0 -> the entry has to overlap with the hotbox
+    #     0.5 -> half the entry has to overlap
+    #     1 -> the center has to overlap
+    #     2 -> the whole lines has to be inside
+    #     """
+    #
+    #     pairs = []
+    #     indexed = []
+    #     for entry in entries:
+    #         y = entry.pos[1]
+    #         height = entry.size[1]
+    #         """
+    #         decreases the entry "size" by size * margins
+    #         top_line
+    #             y + height * margins / 2
+    #
+    #         bottom_line
+    #             y + height - height * margins / 2
+    #             =>
+    #             y + height(1 - * margins  / 2)
+    #         """
+    #
+    #         bottom_line = y + height * margins / 2
+    #         top_line = y + height * (1 - margins / 2)
+    #
+    #         for j, indexed_entry in enumerate(indexed):
+    #             # if the top or bottom of the hit-box collides
+    #             i_y = indexed_entry.pos[1]
+    #             i_height = indexed_entry.size[1]
+    #             top_hit_box, bottom_hit_box = i_y, i_y + i_height
+    #             if top_hit_box <= bottom_line <= bottom_hit_box or \
+    #                     top_hit_box <= top_line <= bottom_hit_box:
+    #                 pairs.append((indexed_entry, entry))
+    #
+    #         indexed.append(entry)
+    #
+    #     return pairs
+    #
+    # def get_pairs(self):
+    #     def connects_to(x):
+    #         x_cn_to = []
+    #         for pair in possible_pairs:
+    #             if x in pair:
+    #                 x_cn_to.append(pair)
+    #
+    #         return x_cn_to
+    #
+    #     data = self.entries.copy()
+    #
+    #     possible_pairs = self.get_connections()
+    #
+    #     tr_pairs: list[tuple[Entry, Entry]] = []
+    #     non_pairs = []
+    #
+    #     data.sort(key=lambda x: x.pos[0])  # sort by x pos
+    #     while 0 < len(data):
+    #         # a start that is guarantied to not have multiple things before it
+    #         current_point = data[0]
+    #
+    #         # all pairs with "current_point" included
+    #         cn_pairs = connects_to(current_point)
+    #
+    #         if not len(cn_pairs):
+    #             data.pop(0)
+    #             non_pairs.append(current_point)
+    #             continue
+    #
+    #         cn_pairs.sort(key=lambda x: x[0].pos[0] if x[1] == current_point else x[1].pos[0])
+    #         best_cn = cn_pairs[0]
+    #
+    #         data.remove(best_cn[0])
+    #         data.remove(best_cn[1])
+    #
+    #         tr_pairs.append(best_cn)
+    #
+    #         possible_pairs = [possible_pair for possible_pair in possible_pairs
+    #                           if not any(entry in possible_pair for entry in best_cn)]
+    #
+    #     return tr_pairs, non_pairs
 
     def update_pairs(self):
         self.pairs, self.non_pairs = self.get_pairs()
@@ -502,8 +577,8 @@ class Controller:
                 a_rel = 0, a.pos[1] - b.pos[1]
                 b_rel = b.pos[0] - a.pos[0], 0
 
-            image_size = (b.pos[0] - a.pos[0] + b.size[0],
-                          abs(b.pos[1] - a.pos[1]) + b.size[1])
+            image_size = (int(b.pos[0] - a.pos[0] + b.size[0]),
+                          int(abs(b.pos[1] - a.pos[1]) + b.size[1]))
 
             image = Image.new(mode="RGBA",
                               size=image_size)
@@ -517,6 +592,7 @@ class Controller:
             draw.line((from_pos, to_pos), fill=(0, 0, 0))
 
             def remove_colour(pos, rect_size):
+                pos = (int(pos[0]), int(pos[1]))
                 i = Image.new(mode="RGBA",
                               size=rect_size)
                 image.paste(i, pos)

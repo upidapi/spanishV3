@@ -4,6 +4,7 @@ controls the controller
 
 import pygame as pg
 
+from Data import load_raw_data
 from FixRawInput.V2.Entry import Controller, Entry
 
 
@@ -17,6 +18,9 @@ class Handler:
         self.lan_s = lan_s
 
         self.mode = 0
+
+        data = load_raw_data()
+        self.populate_entries(data)
 
     def configure_screen(self):
         pass
