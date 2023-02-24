@@ -9,13 +9,6 @@ screen = pg.display.set_mode([1000, 1000])
 
 controller = Controller(screen, ("swe", "spa"))
 
-# abc = "abcdefghijklmnop"
-# for x in range(10):
-#     Entry(handler.controller,
-#           text=str(x),
-#           o_text=abc[x],
-#           pos=(10, x*50))
-
 running = True
 while running:
     events = pg.event.get()

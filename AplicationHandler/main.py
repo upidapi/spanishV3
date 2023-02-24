@@ -1,12 +1,16 @@
-import FixRawInput
-import Quiz
+import FixRawInput.Controller
+# import Quiz
 from Data import new_image
 
 import tkinter as tk
 from tkinter import filedialog
 
+import pygame as pg
+
 
 class CallFuncs:
+    pg_instance = None
+
     @staticmethod
     def load_new_image(_):
         image_path = tk.filedialog.askopenfilename(
@@ -18,7 +22,32 @@ class CallFuncs:
         # new_image("../Data/other_data/selected_image.jpg", languishes)
         new_image(image_path, languishes)
 
-        FixRawInput.main.__init__(languishes)
+        CallFuncs.fix_raw_input_loop()
+
+    @staticmethod
+    def fix_raw_input_loop(_=None):
+        CallFuncs.fetch_pg_instance()
+
+        controller = FixRawInput.Controller(CallFuncs.pg_instance, ("swe", "spa"))
+        clock = pg.time.Clock()
+
+        running = True
+        while running:
+            events = pg.event.get()
+
+            for event in events:
+                if event.type == pg.QUIT:
+                    running = False
+
+            controller.compute_frame(events)
+
+            clock.tick(60)
+
+    @staticmethod
+    def fetch_pg_instance():
+        if CallFuncs.pg_instance is None:
+            pg.init()
+            CallFuncs.pg_instance = pg.display.set_mode([1000, 1000])
 
 
 class WindowSetup:
@@ -72,7 +101,7 @@ class WindowSetup:
         load_image.place(relx=0.7, rely=0.5, anchor=tk.CENTER)
 
         load_old_data = tk.Button(root, text='load old data',
-                                  command=lambda: WindowSetup.close(FixRawInput.main.__init__))
+                                  command=lambda: WindowSetup.close(CallFuncs.fix_raw_input_loop()))
 
         load_old_data.place(relx=0.3, rely=0.5, anchor=tk.CENTER)
 
