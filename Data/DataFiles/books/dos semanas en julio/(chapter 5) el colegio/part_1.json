@@ -24,6 +24,10 @@
         "mynt; valuta"
     ],
     [
+        "(el) habitante",
+        "inv\u00e5nare"
+    ],
+    [
         "(el) rey",
         "kung"
     ],
@@ -45,18 +49,14 @@
     ],
     [
         "(la) red",
-        "\"n\u00e5tet\". internet"
+        "\"n\u00e4tet\", internet"
     ],
     [
         "(la) pregunta",
         "fr\u00e5ga"
     ],
     [
-        "correcto",
-        "r\u00e4tt"
-    ],
-    [
-        "(a) clase",
+        "(la) clase",
         "klass"
     ],
     [
@@ -76,12 +76,20 @@
         "veta"
     ],
     [
+        "correcto",
+        "r\u00e4tt"
+    ],
+    [
         "(la) asignatura",
         "\u00e4mne"
     ],
     [
         "llegar tarde",
         "komma f\u00f6r sent"
+    ],
+    [
+        "(la) capital",
+        "huvudstad"
     ],
     [
         "no te preocupes",
@@ -128,7 +136,7 @@
         "skjorta"
     ],
     [
-        "(la) falda",
+        "{la) falda",
         "kjol"
     ],
     [
@@ -144,28 +152,16 @@
         "han tar p\u00e5 sig"
     ],
     [
-        "(el) habitante",
-        "inv\u00e5nare"
-    ],
-    [
-        "(la) capital",
-        "huvudstad"
-    ],
-    [
-        "(el) uniforme",
-        "h\u00e4r: skoluniform"
-    ],
-    [
-        "(el) ordenador,(la) computadora (LA)",
-        "dator"
+        "uniforme",
+        "h\u00e5r: skoluniform"
     ],
     [
         "\u00bfPuedo ir al ba\u00f1o?",
-        "F\u00e5r jag g\u00e5 p\u00e5 toalettenh"
+        "F\u00e5r jag g\u00e5 p\u00e5 toaletten?"
     ],
     [
         "Silencio, por favor",
-        "Tystnad, tack"
+        "Tystna, tack"
     ],
     [
         "Perd\u00f3n por llegar tarde",
@@ -177,11 +173,7 @@
     ],
     [
         "levanta la mano, por favor",
-        "R\u00e4ck upp handen, tack"
-    ],
-    [
-        "(el) examen",
-        "prov"
+        "Rack upp handen, tack"
     ],
     [
         "(el) recreo",
@@ -196,8 +188,16 @@
         "l\u00e4xor"
     ],
     [
+        "(el) examen",
+        "prov"
+    ],
+    [
         "(la) pizarra",
         "skrivtavla"
+    ],
+    [
+        "(el) ordenador,(la) computadora (LA)",
+        "dator"
     ],
     [
         "(el) libro",
@@ -208,7 +208,7 @@
         "blyertspenna"
     ],
     [
-        "(la) libreta",
+        "(fa) libreta",
         "skrivbok"
     ],
     [
@@ -248,11 +248,11 @@
         "spr\u00e5k (h\u00e4r spanska)"
     ],
     [
-        "(la) educaci\u00f3n f\u00edsica",
-        "idrott och h\u00e4lsa"
-    ],
-    [
         "(la) optativa",
         "ung. elevens val"
+    ],
+    [
+        "(la) educaci\u00f3n f\u00edsica",
+        "idrott och h\u00e4lsa"
     ]
 ]

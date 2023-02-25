@@ -5,7 +5,7 @@ from typing import Literal
 from Quiz.other import end_screen
 
 
-from Structure.Other import check_correct
+from Structure import check_correct
 
 
 def temp_func_3(_, data_files):

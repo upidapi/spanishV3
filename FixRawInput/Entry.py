@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import math
 import random
+import time
 
 import pygame as pg
 from PIL import Image, ImageDraw
+
+from FixRawInput.TextEntry import TextEntry
 
 DEFAULT_BG = (255, 255, 255)
 ENTRY_SIDE_WIDTH = 5
@@ -32,11 +35,6 @@ def get_n_good_colours(n):
     colours = [[x * 255 for x in hsv_to_rgb(i / (n + 1), 1, 1)] for i in range(n)]
     random.shuffle(colours)
     return colours
-
-
-class TextEntry:
-    pass
-    # implementation of the text_entry part of the entry
 
 
 class Entry:
@@ -81,8 +79,11 @@ class Entry:
 
         self.background_colour = DEFAULT_BG
 
+        self.last_text_edit = time.time()
+
         self.text: str = text
         self.o_text: str = o_text
+        self.cursor_pos = 0
 
         self.pos: tuple[int, int] = pos
         self.size: tuple[int, int] = (0, 0)
@@ -92,6 +93,14 @@ class Entry:
 
         self.save_state = None
         self.checkpoint()
+
+    @property
+    def bef_cursor(self):
+        return self.text[:self.cursor_pos]
+
+    @property
+    def aft_cursor(self):
+        return self.text[self.cursor_pos:]
 
     @property
     def has_focus(self):
@@ -108,6 +117,15 @@ class Entry:
 
     def un_focus(self):
         self.handler.focused_entry = None
+
+        if len(self.text) == 0:
+            self.text = self.o_text
+            self.update_size()
+
+        if len(self.o_text) == 0:
+            self.o_text = self.text
+            self.update_size()
+
         if len(self.text) + len(self.o_text) == 0:
             self.delete()
 
@@ -172,15 +190,6 @@ class Entry:
         # I have to implement the cursor first
         raise NotImplementedError(".split is not yet implemented")
 
-    def handle_text(self, event):
-        character = event.unicode
-        if character.isprintable() and character != '':
-            self.text += character
-            self.update_size()
-        if event.key == pg.K_BACKSPACE:
-            self.text = self.text[:-1]
-            self.update_size()
-
     # <editor-fold desc="drag">
     def start_drag(self, pos):
         self.handler.dragged_entry = self
@@ -192,7 +201,56 @@ class Entry:
         if self.delta_drag_start is not None:
             self.pos = (pos[0] - self.delta_drag_start[0],
                         pos[1] - self.delta_drag_start[1])
+
     # </editor-fold>
+    def handle_cursor(self, event):
+        ctrl = pg.key.get_mods() & pg.KMOD_CTRL
+
+        if event.key == pg.K_LEFT:
+            self.last_text_edit = time.time()
+
+            if ctrl:
+                try:
+                    reverse = self.bef_cursor[::-1][1:]
+                    first_space_index = reverse.index(" ")
+                except ValueError:
+                    self.cursor_pos = 0
+                else:
+                    self.cursor_pos -= first_space_index + 1
+            else:
+                self.cursor_pos = max(0, self.cursor_pos - 1)
+
+        if event.key == pg.K_RIGHT:
+            self.last_text_edit = time.time()
+
+            if ctrl:
+                try:
+                    first_space_index = self.aft_cursor.index(" ")
+                except ValueError:
+                    self.cursor_pos = len(self.text)
+                else:
+                    self.cursor_pos += first_space_index + 1
+            else:
+                self.cursor_pos = min(len(self.text), self.cursor_pos + 1)
+
+    def handle_text(self, event):
+        character = event.unicode
+        if character.isprintable() and character != '':
+            self.text = self.bef_cursor + character + self.aft_cursor
+            self.cursor_pos += 1
+
+            self.last_text_edit = time.time()
+
+            self.update_size()
+
+        if event.key == pg.K_BACKSPACE:
+            if len(self.bef_cursor):
+                self.text = self.bef_cursor[:-1] + self.aft_cursor
+                self.cursor_pos -= 1
+
+                self.last_text_edit = time.time()
+
+                self.update_size()
 
     def handle_drag_event(self, event):
         shift = pg.key.get_mods() & pg.KMOD_SHIFT
@@ -225,6 +283,8 @@ class Entry:
         ctrl = pg.key.get_mods() & pg.KMOD_CTRL
 
         if event.type == pg.KEYDOWN:
+            self.handle_cursor(event)
+
             if ctrl:
                 if event.key == pg.K_s:
                     self.checkpoint()
@@ -250,25 +310,42 @@ class Entry:
         #     if event.button == 2:  # middle click
         #         self.delete()
 
-    def draw(self):
+    def draw_text(self):
         text_colour = (0, 0, 0)
+
         if self in self.handler.non_pairs:
             text_colour = (255, 0, 0)
 
         if self.has_focus:
             text_colour = (0, 255, 0)
 
+        text_surface = self.handler.font.render(
+            self.text, True, text_colour)
+
+        self.handler.surface.blit(text_surface,
+                                  (self.pos[0] + ENTRY_SIDE_WIDTH, self.pos[1]))
+
+    def draw_cursor(self):
+        if (self.last_text_edit - time.time()) % 1 > 0.5:
+            w, h = self.handler.font.size(self.bef_cursor)
+
+            rect = pg.Rect(
+                self.pos[0] + w + ENTRY_SIDE_WIDTH, self.pos[1], 2, h
+            )
+
+            pg.draw.rect(self.handler.surface, (0, 0, 0), rect)
+
+    def draw(self):
         rect = pg.Rect(self.pos, self.size)
         pg.draw.rect(self.handler.surface,
                      self.background_colour,
                      rect)
 
-        text_surface = self.handler.font.render(
-            self.text, True, text_colour)
+        self.draw_text()
 
-        self.handler.surface.blit(text_surface,
-                                  (self.pos[0] + ENTRY_SIDE_WIDTH,
-                                   self.pos[1]))
+        if self.has_focus:
+            self.draw_cursor()
+
 
 
 class Handler:
@@ -330,6 +407,7 @@ class Handler:
         if self.focused_entry is not None:
             self.focused_entry.un_focus()
         self.focused_entry = entry
+        entry.cursor_pos = len(entry.text)
 
     def change_lan(self):
         self.primary_lan = not self.primary_lan

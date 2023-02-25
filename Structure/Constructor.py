@@ -1,4 +1,4 @@
-from Main import Node
+from . import Node
 
 
 def convert_linear_word(text: str) -> Node:

@@ -2,7 +2,7 @@
 # from Constructor import convert_linear_word
 
 
-from Main import Node, StructureType
+from . import Node, StructureType
 from DisplayStructure import structure_image
 
 # a = convert("hello")

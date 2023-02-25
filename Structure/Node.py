@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from typing import Iterable
-
-
 class Node:
     """
     WARNING!
@@ -382,8 +379,3 @@ class Node:
         self.make_head_tail()
         self.point_simplify()
     # </editor-fold>
-
-
-# typehint for structure
-StructurePartType = Iterable['structure_type'] | Node
-StructureType = tuple[StructurePartType] | list[StructurePartType]

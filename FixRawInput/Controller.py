@@ -77,7 +77,6 @@ class Controller:
         if self.handler.show_entries:
             self.handler.draw_entries()
 
-            if self.mode == 0:
-                self.handler.draw_connections()
+            self.handler.draw_connections()
 
         pg.display.flip()

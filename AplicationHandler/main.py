@@ -1,5 +1,5 @@
 import FixRawInput.Controller
-# import Quiz
+import Quiz
 from Data import new_image
 
 import tkinter as tk
