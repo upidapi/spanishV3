@@ -32,7 +32,7 @@ def rw_label_setup(root):
         amount_wrong = len(handler.wrong)
         done = amount_wrong + amount_right
         total = len(handler.current) + done
-        total = total - 1 if correct else  total
+        total = total - 1 if correct else total
 
         total_done_right_var.set(f"{total}/{done}/{amount_right}")
 

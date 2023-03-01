@@ -2,6 +2,7 @@ from typing import Literal
 
 import tkinter as tk
 
+from Structure import check_correct
 
 ModeType = Literal[
     "same",
@@ -16,37 +17,54 @@ class Word:
     def __init__(self, text, translation):
         self.switch = False
 
-        self.lan_1 = text
-        self.lan_2 = translation
+        self.lan_1_text = text
+        self.lan_2_text = translation
+
+        self.lan_1_node = text
+        self.lan_2_node = translation
 
     @property
     def primary_text(self):
         if self.switch:
-            return self.lan_2
-        return self.lan_1
+            return self.lan_2_text
+        return self.lan_1_text
 
     @property
     def translation_text(self):
         if self.switch:
-            return self.lan_1
-        return self.lan_2
+            return self.lan_1_text
+        return self.lan_2_text
+
+    @property
+    def primary_node(self):
+        if self.switch:
+            return self.lan_2_node
+        return self.lan_1_node
+
+    @property
+    def translation_node(self):
+        if self.switch:
+            return self.lan_1_node
+        return self.lan_2_node
 
 
 class Words:
     def __init__(self):
-        self.all_words = []
-        self.sections_left = []
-        self.words_left = []
+        self.all_words: list[Word] = []
+        self.sections_left: list[Word] = []
+        self.words_left: list[Word] = []
 
-        self.last_section = []
-        self.incorrect_words = []
-        self.current_word = None
+        self.last_section: list[Word] = []
+        self.incorrect_words: list[Word] = []
+        self.current_word: Word | None = None
 
-        self.section_size = 10
+        self.section_size: int | None = 10
 
         self.on_new_word = None
         self.on_correct = None
         self.on_wrong = None
+
+        self.get_new_words()
 
     def get_available_modes(self) -> list[str]:
 
@@ -137,3 +155,8 @@ class Words:
 
         self.current_word = self.words_left.pop(0)
         self.on_new_word(self.current_word)
+
+    def temp_name(self, text):
+        correct = check_correct(self.current_word.primary_node,
+                                self.current_word.primary_text)
+
