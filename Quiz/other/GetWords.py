@@ -165,6 +165,7 @@ class Words:
                                    command=lambda: select(button_mode))
                 button.place(relx=0.5, y=y_pos, anchor=tk.CENTER)
 
+
         add_button("lan_1", "from lan_1 to lan_2")
         add_button("lan_2", "from lan_2 to lan_1")
         add_button("same", "the same words as last time")

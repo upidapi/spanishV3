@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from typing import Literal
 
 
 def matrix_map(func: callable, *args: list | tuple):
@@ -19,6 +20,8 @@ class Template:
         self.pos: list[int, int] = [0, 0]
         self.size: list[int, int] = [0, 0]
 
+        self.fill = False
+
     @property
     def corner_pos(self):
         """
@@ -31,27 +34,16 @@ class Template:
         pass
 
 
-class Container(Template):
-    def __init__(self, *args, **kwargs):
-        super().__init__(args, kwargs)
+class BasicContainer(Template):
+    def __init__(self, parent, **kwargs):
+        super().__init__(kwargs)
 
         self.show = True
 
         self.min_size: list[int, int] = [0, 0]
 
-        self.parent = None
+        self.parent = parent
         self.children: list = []
-
-        # @property
-    # def parents(self):
-    #     """
-    #     returns all the parents of self
-    #     """
-    #
-    #     return self.parent + self.parents()
-    #
-    # def abs_pos(self):
-    #     return matrix_add(*[parent.pos for parent in [self, *self.parents]])
 
     def update_min_size(self, changed: Template):
         self.min_size = matrix_map(max, [child.corner_pos for child in self.children])
@@ -67,3 +59,39 @@ class Container(Template):
             for child in self.children:
                 child.draw(matrix_add(pos, child.pos), surface)
 
+
+class Container(BasicContainer):
+    def __init__(self, parent, **kwargs):
+        super().__init__(kwargs)
+
+        self.anchor_container = BasicContainer(parent)
+        # place anchor_container
+        self.pad_container = BasicContainer(self.anchor_container)
+        # place pad_container
+        self.ipad_container = BasicContainer(self.pad_container)
+        # place ipad_container
+
+
+        self.geometry_manager: Literal["place", "grid", None] = None
+
+    def update_min_size(self, changed: Template):
+        self.min_size = matrix_map(max, [child.corner_pos for child in self.children])
+
+        self.parent.update_size(self)
+
+    def set_geometry_manager(self, to):
+        if self.geometry_manager is None:
+            self.geometry_manager = to
+            return
+
+        if self.geometry_manager != to:
+            raise f"Can't use multiple geometry managers in one container"
+
+    def place(self, *, _):
+        self.set_geometry_manager("place")
+
+    # def pack(self, *, _):
+    #     self.set_geometry_manager("pack")
+
+    def grid(self, *, _):
+        self.set_geometry_manager("grid")
