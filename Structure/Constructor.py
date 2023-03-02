@@ -1,6 +1,10 @@
 from . import Node
 
 
+def convert(text: str, flags: list) -> Node:
+    return convert_linear_word(text)
+
+
 def convert_linear_word(text: str) -> Node:
     cur = Node("head")
     for char in text:
@@ -61,4 +65,3 @@ def replace(replace_str: str, with_str: str, struct_node: Node) -> None:
 
 def make_optional(replace_str: str, struct_node: Node) -> None:
     replace(replace_str, "", struct_node)
-

@@ -1,8 +1,10 @@
 from typing import Literal
 
 import tkinter as tk
+import json
 
 from Structure import check_correct
+from Structure.Constructor import convert
 
 ModeType = Literal[
     "same",
@@ -14,14 +16,19 @@ ModeType = Literal[
 
 
 class Word:
-    def __init__(self, text, translation):
+    def __init__(self,
+                 lan_1_text,
+                 lan_2_text,
+                 lan_1_node,
+                 lan_2_node):
+
         self.switch = False
 
-        self.lan_1_text = text
-        self.lan_2_text = translation
+        self.lan_1_text = lan_1_text
+        self.lan_2_text = lan_2_text
 
-        self.lan_1_node = text
-        self.lan_2_node = translation
+        self.lan_1_node = lan_1_node
+        self.lan_2_node = lan_2_node
 
     @property
     def primary_text(self):
@@ -48,9 +55,57 @@ class Word:
         return self.lan_2_node
 
 
+def load_words(data_files):
+    book_data = []
+    for file in data_files:
+        with open(file) as jsonFile:
+            book_data += json.load(jsonFile)
+            jsonFile.close()
+    return book_data
+
+
+def convert_to_struct(config_file, words):
+    with open(config_file) as jsonFile:
+        config = json.load(jsonFile)
+        jsonFile.close()
+
+    if config is None:
+        raise TypeError("invalid config file")
+
+    structs = []
+    for word in words:
+        lan_1_node = convert(word[0], config)
+        lan_2_node = convert(word[1], config)
+        structs.append(Word(*word, lan_1_node, lan_2_node))
+
+    return structs
+
+
+def get_words() -> list[Word]:
+    # from Data.load_data import load_book_data
+    from Data.FileBrowser import ask_for_files
+
+    words: list[Word] = []
+
+    books = ask_for_files()
+    if books:
+        for book in books:
+            config_file = book["config_file"]
+            book_files = book["data_files"]
+            book_words = load_words(book_files)
+            words += convert_to_struct(config_file, book_words)
+
+        return words
+
+    else:
+        # temporary fix
+        # if you don't select anything just bring it upp again
+        return get_words()
+
+
 class Words:
     def __init__(self):
-        self.all_words: list[Word] = []
+        self.all_words: list[Word] = get_words()
         self.sections_left: list[Word] = []
         self.words_left: list[Word] = []
 
@@ -149,6 +204,9 @@ class Words:
         self.last_section = self.words_left.copy()
 
     def next_word(self):
+        if self.on_new_word is not None:
+            self.on_new_word()
+
         if not len(self.words_left):
             self.get_new_words()
             return
@@ -156,7 +214,17 @@ class Words:
         self.current_word = self.words_left.pop(0)
         self.on_new_word(self.current_word)
 
-    def temp_name(self, text):
-        correct = check_correct(self.current_word.primary_node,
-                                self.current_word.primary_text)
+    def on_enter(self, text):
+        correct = check_correct(self.current_word.translation_text, text)
+
+        if correct:
+            if self.on_correct is not None:
+                self.on_correct()
+
+            self.next_word()
+
+        else:
+            if self.on_wrong is not None:
+                self.on_wrong()
+
 
