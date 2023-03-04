@@ -1,3 +1,4 @@
+import inspect
 from abc import abstractmethod
 from typing import Literal
 
@@ -15,25 +16,6 @@ def matrix_add(*args: list | tuple):
     return matrix_map(sum, *args)
 
 
-class Template:
-    def __init__(self, *args, **kwargs):
-        self.pos: list[int, int] = [0, 0]
-        self.size: list[int, int] = [0, 0]
-
-        self.fill = False
-
-    @property
-    def corner_pos(self):
-        """
-        self.pos + self.size
-        """
-        return matrix_add(self.pos + self.size)
-
-    @abstractmethod
-    def update_min_size(self, changed):
-        pass
-
-
 class PointerVar:
     def __init__(self, value, handler):
         """
@@ -48,46 +30,8 @@ class PointerVar:
         return object.__getattribute__(self.handler, self.value)
 
 
-class BasicContainer(Template):
-    def __init__(self, parent, *args, **kwargs):
-        """
-        :param parent: container self is contained by
-        :param kwargs:
-        """
-        super().__init__(kwargs)
-
-        self.handler = None
-
-        self.show = True
-
-        self.min_size: list[int, int] = [0, 0]
-
-        self.parent = parent
-        self.children: list = []
-
-    def update_min_size(self, changed: Template):
-        self.min_size = matrix_map(max, [child.corner_pos for child in self.children])
-
-        self.parent.update_size(self)
-
-    def update_pos(self):
-        pass
-
-    def update_size(self):
-        pass
-
-    def draw_recursion(self, pos, surface):
-        """
-        :param pos: the absolute pos of self
-        :param surface:
-        """
-        if self.show:
-            for child in self.children:
-                child.draw_recursion(matrix_add(pos, child.pos), surface)
-
-
 class Widget:
-    def __init__(self, parent, *args,
+    def __init__(self, parent, *,
                  x: None | int = 0,
                  y: None | int = 0,
                  rel_x: None | float = 0,
@@ -98,12 +42,14 @@ class Widget:
                  ipad_x: list[int, int] = (0, 0),
                  ipad_y: list[int, int] = (0, 0),
 
+                 min_size: list[int, int] = None,
                  size: list[int, int] = (0, 0),
+                 max_size: list[int, int] = None,
                  fill: bool = False,
                  fit: bool = False,
 
                  show: bool = True,
-                 ):
+                 **kwargs):
 
         self.parent = parent
         self.children: list = []
@@ -157,7 +103,73 @@ class Widget:
             raise TypeError("No size controller found")
         # </editor-fold>
 
-    def update_min_size(self, changed: Template):
+    def place(self,
+              x: None | int = 0,
+              y: None | int = 0,
+              rel_x: None | float = 0,
+              rel_y: None | float = 0,
+
+              pad_x: list[int, int] = (0, 0),
+              pad_y: list[int, int] = (0, 0),
+              ipad_x: list[int, int] = (0, 0),
+              ipad_y: list[int, int] = (0, 0),
+
+              min_size: list[int, int] = None,
+              size: list[int, int] = (0, 0),
+              max_size: list[int, int] = None,
+              fill: bool = False,
+              fit: bool = False):
+
+        # <editor-fold desc="pos">
+        if x is None and rel_x is None:
+            raise TypeError("no x pos found")
+
+        if x and rel_x:
+            raise TypeError("multiple x pos found")
+
+        if y is None and rel_y is None:
+            raise TypeError("no y pos found")
+
+        if y and rel_y:
+            raise TypeError("multiple y pos found")
+
+        self.x: int = x
+        self.y: int = y
+        self.rel_x: float = rel_x
+        self.rel_y: float = rel_y
+        # </editor-fold>
+
+        # <editor-fold desc="padding">
+        self.pad_x: list[int, int] = pad_x
+        self.pad_y: list[int, int] = pad_y
+        self.ipad_x: list[int, int] = ipad_x
+        self.ipad_y: list[int, int] = ipad_y
+        # </editor-fold>
+
+        # <editor-fold desc="size">
+        self.min_size: list[int, int] = [0, 0]
+
+        self.internal_size: list[int, int] = [0, 0]
+        self.size: list[int, int] = size
+        self.external_size: list[int, int] = [0, 0]
+
+        # make self fill parent
+        self.fill: bool = fill
+        # make self contract around min_size
+        self.fit: bool = fit
+
+        temp = self.fill + self.fit + bool(self.size)
+        if temp > 1:
+            used = {'fill' if self.fill else ''}, {'fit' if self.fill else ''}, {'size' if self.fill else ''}
+            used = ", ".join(used[:-1]) + " and " + used[-1]
+            raise TypeError(f"Can't use multiple size managers ({used})")
+        if temp == 0:
+            raise TypeError("No size controller found")
+        # </editor-fold>
+
+
+
+    def update_min_size(self, changed):
         self.min_size = matrix_map(max, [child.corner_pos for child in self.children])
 
         self.parent.update_min_size(self)
@@ -194,15 +206,20 @@ class Widget:
                                   self.size[1] + total_pad[1]]
 
     def update_pos(self):
-        if self.rel_x is not None:
-            self.pos[0] = (self.parent.size[0] - self.size[0]) * self.rel_x + self.size[0] // 2
-        else:
-            self.pos[0] = self.x
+        if self.fill:
+            self.x = 0
+            self.y = 0
 
-        if self.rel_y is not None:
-            self.pos[1] = (self.parent.size[1] - self.size[1]) * self.rel_y + self.size[0] // 2
+        elif self.fit:
+            self.x = 0
+            self.y = 0
+
         else:
-            self.pos[1] = self.y
+            if self.rel_x is not None:
+                self.x = (self.parent.size[0] - self.size[0]) * self.rel_x + self.size[0] // 2
+
+            if self.rel_y is not None:
+                self.y = (self.parent.size[1] - self.size[1]) * self.rel_y + self.size[0] // 2
 
     def draw(self, pos):
         pass
@@ -223,8 +240,20 @@ class Widget:
                                      surface)
 
 
-class NewContainer(Widget):
-    def __init__(self, parent, *args,
+class Container(Widget):
+    class Square:
+        def __init__(self,
+                     row,
+                     column,
+                     row_span=1,
+                     column_span=1):
+
+            self.row = row
+            self.column = column
+            self.row_span = row_span
+            self.column_span = column_span
+
+    def __init__(self, parent, *,
                  x: None | int = 0,
                  y: None | int = 0,
                  rel_x: None | float = 0,
@@ -235,89 +264,26 @@ class NewContainer(Widget):
                  ipad_x: list[int, int] = (0, 0),
                  ipad_y: list[int, int] = (0, 0),
 
+                 min_size: list[int, int] = None,
                  size: list[int, int] = (0, 0),
+                 max_size: list[int, int] = None,
                  fill: bool = False,
                  fit: bool = False,
 
-                 show: bool = True,
-                 **kwargs):
+                 show: bool = True):
 
-        super().__init__(parent, args, kwargs)
+        # gets all arguments and passes them on to super class
+        sig, current_locals = inspect.signature(self.__init__), locals()
+        args = {param.name: current_locals[param.name] for param in sig.parameters.values()}
+        super().__init__(**args)
 
-
-
-# class PadContainer(BasicContainer):
-#     def __init__(self, parent, *args,
-#                  pad_x: list[int, int] = (int, int),
-#                  pad_y: list[int, int] = (int, int),
-#                  **kwargs):
-#
-#         super().__init__(parent, args, kwargs)
-#
-#         self.pad_x = pad_x
-#         self.pad_y = pad_y
-#
-#         self.pad_container = BasicContainer(parent)
-#
-#         self.pad_container.pos =
-#
-#         self.children = PointerVar("children", self.pad_container)
-#
-#
-#
-# class IpadContainer(PadContainer):
-#     def __init__(self, parent, *args,
-#                  ipad_x: list[int, int] = (int, int),
-#                  ipad_y: list[int, int] = (int, int),
-#                  **kwargs):
-#
-#         super().__init__(parent, args, kwargs)
-#
-#         self.ipad_x = ipad_x
-#         self.ipad_y = ipad_y
-
-
-
-class Container(BasicContainer):
-    def __init__(self, parent, *,
-                 rel_x: float = 0,
-                 rel_y: float = 0,
-                 pad_x: list[int, int] = (int, int),
-                 pad_y: list[int, int] = (int, int),
-                 ipad_x: list[int, int] = (int, int),
-                 ipad_y: list[int, int] = (int, int),
-                 **kwargs):
-
-        super().__init__(kwargs)
-
-        self.rel_x = rel_x
-        self.rel_y = rel_y
-
-        self.pad_x = pad_x
-        self.pad_y = pad_y
-
-        self.ipad_x = ipad_x
-        self.ipad_y = ipad_y
-
-        self.anchor_container = BasicContainer(parent)
-        self.anchor_container.pos = PointerVar("pos", self)
-
-        # place anchor_container
-        self.pad_container = BasicContainer(self.anchor_container)
-        # place pad_container
-        self.ipad_container = BasicContainer(self.pad_container)
-        # place ipad_container
+        self.children = []
 
         self.geometry_manager: Literal["place", "grid", None] = None
 
-    def temp_name(self, x, y):
-        bounding_box = [(self.parent.size[0] - self.size[0]) * x + self.size[0] // 2,
-                        (self.parent.size[1] - self.size[1]) * y + self.size[0] // 2]
-
-    def update_min_size(self, changed: Template, update_parent=True):
-        self.min_size = matrix_map(max, [child.corner_pos for child in self.children])
-        if update_parent:
-            self.parent.update_size(self)
+        self.grid_values = {}
+        self.x_grid_list = []
+        self.y_grid_list = []
 
     def set_geometry_manager(self, to):
         if self.geometry_manager is None:
@@ -330,10 +296,49 @@ class Container(BasicContainer):
     def place(self, *, _):
         self.set_geometry_manager("place")
 
-    # def pack(self, *, _):
-    #     self.set_geometry_manager("pack")
-
-    def grid(self, *, _):
+    def grid(self, child, *, row, column, row_span=1, column_span=1):
+        self.children.append(child)
+        self.grid_values[child] = {row, column}
         self.set_geometry_manager("grid")
 
 
+class Grid(Widget):
+    def __init__(self, parent, *,
+                 x: None | int = 0,
+                 y: None | int = 0,
+                 rel_x: None | float = 0,
+                 rel_y: None | float = 0,
+
+                 pad_x: list[int, int] = (0, 0),
+                 pad_y: list[int, int] = (0, 0),
+                 ipad_x: list[int, int] = (0, 0),
+                 ipad_y: list[int, int] = (0, 0),
+
+                 min_size: list[int, int] = None,
+                 size: list[int, int] = (0, 0),
+                 max_size: list[int, int] = None,
+                 fill: bool = False,
+                 fit: bool = False,
+
+                 show: bool = True,
+                 **kwargs):
+
+        # gets all arguments and passes them on to super class
+        sig, current_locals = inspect.signature(self.__init__), locals()
+        args = {param.name: current_locals[param.name] for param in sig.parameters.values()}
+        super().__init__(**args)
+
+        self.rect_s = []
+
+        self.x_grid_size = []
+        self.y_grid_size = []
+
+        self.children = []
+
+    def grid(self,
+             row,
+             column,
+             row_span=1,
+             column_span=1):
+
+        self.rect_s.append()
