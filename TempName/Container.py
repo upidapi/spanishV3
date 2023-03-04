@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import inspect
-from abc import abstractmethod
-from typing import Literal
+from typing import Type
 
 
 def matrix_map(func: callable, *args: list | tuple):
@@ -32,93 +33,73 @@ class PointerVar:
 
 class Widget:
     def __init__(self, parent, *,
-                 x: None | int = 0,
-                 y: None | int = 0,
-                 rel_x: None | float = 0,
-                 rel_y: None | float = 0,
-
-                 pad_x: list[int, int] = (0, 0),
-                 pad_y: list[int, int] = (0, 0),
-                 ipad_x: list[int, int] = (0, 0),
-                 ipad_y: list[int, int] = (0, 0),
-
-                 min_size: list[int, int] = None,
-                 size: list[int, int] = (0, 0),
-                 max_size: list[int, int] = None,
-                 fill: bool = False,
-                 fit: bool = False,
-
                  show: bool = True,
                  **kwargs):
 
-        self.parent = parent
-        self.children: list = []
-
-        self.show: bool = show
-
         # <editor-fold desc="pos">
-        if x is None and rel_x is None:
-            raise TypeError("no x pos found")
-
-        if x and rel_x:
-            raise TypeError("multiple x pos found")
-
-        if y is None and rel_y is None:
-            raise TypeError("no y pos found")
-
-        if y and rel_y:
-            raise TypeError("multiple y pos found")
-
-        self.x: int = x
-        self.y: int = y
-        self.rel_x: float = rel_x
-        self.rel_y: float = rel_y
+        self.x: None | int = None
+        self.y: None | int = None
+        self.rel_x: None | float = None
+        self.rel_y: None | float = None
         # </editor-fold>
 
         # <editor-fold desc="padding">
-        self.pad_x: list[int, int] = pad_x
-        self.pad_y: list[int, int] = pad_y
-        self.ipad_x: list[int, int] = ipad_x
-        self.ipad_y: list[int, int] = ipad_y
+        self.pad_x: list[int, int] = [0, 0]
+        self.pad_y: list[int, int] = [0, 0]
+        self.ipad_x: list[int, int] = [0, 0]
+        self.ipad_y: list[int, int] = [0, 0]
         # </editor-fold>
 
         # <editor-fold desc="size">
-        self.min_size: list[int, int] = [0, 0]
+        self.min_size: None | list[int, int] = None
+        self.max_size: None | list[int, int] = None
 
         self.internal_size: list[int, int] = [0, 0]
-        self.size: list[int, int] = size
+        self.size: None | list[int, int] = None
         self.external_size: list[int, int] = [0, 0]
 
         # make self fill parent
-        self.fill: bool = fill
+        self.fill: bool = False
         # make self contract around min_size
-        self.fit: bool = fit
-
-        temp = self.fill + self.fit + bool(self.size)
-        if temp > 1:
-            used = {'fill' if self.fill else ''}, {'fit' if self.fill else ''}, {'size' if self.fill else ''}
-            used = ", ".join(used[:-1]) + " and " + used[-1]
-            raise TypeError(f"Can't use multiple size managers ({used})")
-        if temp == 0:
-            raise TypeError("No size controller found")
+        self.fit: bool = False
         # </editor-fold>
 
+        self.placed = False
+
+        self.parent: Type[Widget] | Widget = parent
+        self.children: list = []
+
+        # self.pos_changed = False
+        # self.size_changed = False
+        # self.pos_changed = False
+
+        self.show: bool = show
+
+        parent.adopt(self)
+
+    def adopt(self, child):
+        self.children.append(child)
+        child.parent = self
+
     def place(self,
-              x: None | int = 0,
-              y: None | int = 0,
-              rel_x: None | float = 0,
-              rel_y: None | float = 0,
+              x: None | int = None,
+              y: None | int = None,
+              rel_x: None | float = None,
+              rel_y: None | float = None,
 
               pad_x: list[int, int] = (0, 0),
               pad_y: list[int, int] = (0, 0),
               ipad_x: list[int, int] = (0, 0),
               ipad_y: list[int, int] = (0, 0),
 
-              min_size: list[int, int] = None,
-              size: list[int, int] = (0, 0),
-              max_size: list[int, int] = None,
+              min_size: None | list[int, int] = None,
+              max_size: None | list[int, int] = None,
+
+              size: None | list[int, int] = None,
               fill: bool = False,
               fit: bool = False):
+
+        self.placed = True
 
         # <editor-fold desc="pos">
         if x is None and rel_x is None:
@@ -133,30 +114,31 @@ class Widget:
         if y and rel_y:
             raise TypeError("multiple y pos found")
 
-        self.x: int = x
-        self.y: int = y
-        self.rel_x: float = rel_x
-        self.rel_y: float = rel_y
+        self.x = x
+        self.y = y
+        self.rel_x = rel_x
+        self.rel_y = rel_y
         # </editor-fold>
 
         # <editor-fold desc="padding">
-        self.pad_x: list[int, int] = pad_x
-        self.pad_y: list[int, int] = pad_y
-        self.ipad_x: list[int, int] = ipad_x
-        self.ipad_y: list[int, int] = ipad_y
+        self.pad_x = pad_x
+        self.pad_y = pad_y
+        self.ipad_x = ipad_x
+        self.ipad_y = ipad_y
         # </editor-fold>
 
         # <editor-fold desc="size">
-        self.min_size: list[int, int] = [0, 0]
+        self.min_size = [0, 0]
+        self.max_size = [0, 0]
 
-        self.internal_size: list[int, int] = [0, 0]
-        self.size: list[int, int] = size
-        self.external_size: list[int, int] = [0, 0]
+        self.internal_size = [0, 0]
+        self.size = size
+        self.external_size = [0, 0]
 
         # make self fill parent
-        self.fill: bool = fill
+        self.fill = fill
         # make self contract around min_size
-        self.fit: bool = fit
+        self.fit = fit
 
         temp = self.fill + self.fit + bool(self.size)
         if temp > 1:
@@ -167,12 +149,41 @@ class Widget:
             raise TypeError("No size controller found")
         # </editor-fold>
 
+    def un_place(self):
+        self.placed = False
 
+        # <editor-fold desc="pos">
+        self.x: None | int = None
+        self.y: None | int = None
+        self.rel_x: None | float = None
+        self.rel_y: None | float = None
+        # </editor-fold>
 
-    def update_min_size(self, changed):
+        # <editor-fold desc="padding">
+        self.pad_x: list[int, int] = [0, 0]
+        self.pad_y: list[int, int] = [0, 0]
+        self.ipad_x: list[int, int] = [0, 0]
+        self.ipad_y: list[int, int] = [0, 0]
+        # </editor-fold>
+
+        # <editor-fold desc="size">
+        self.min_size: None | list[int, int] = None
+        self.max_size: None | list[int, int] = None
+
+        self.internal_size: list[int, int] = [0, 0]
+        self.size: None | list[int, int] = None
+        self.external_size: list[int, int] = [0, 0]
+
+        # make self fill parent
+        self.fill: bool = False
+        # make self contract around min_size
+        self.fit: bool = False
+        # </editor-fold>
+
+    def update_min_size(self):
         self.min_size = matrix_map(max, [child.corner_pos for child in self.children])
 
-        self.parent.update_min_size(self)
+        self.parent.update_min_size()
 
     def update_size(self):
         total_ipad = (self.ipad_x[0] + self.ipad_x[1],
@@ -240,86 +251,75 @@ class Widget:
                                      surface)
 
 
-class Container(Widget):
-    class Square:
-        def __init__(self,
-                     row,
-                     column,
-                     row_span=1,
-                     column_span=1):
+# class Container(Widget):
+#     def __init__(self, parent, *,
+#                  show: bool = True):
+#
+#         # gets all arguments and passes them on to super class
+#         sig, current_locals = inspect.signature(self.__init__), locals()
+#         args = {param.name: current_locals[param.name] for param in sig.parameters.values()}
+#         super().__init__(**args)
+#
+#         self.children = []
+#
+#         self.geometry_manager: Literal["place", "grid", None] = None
+#
+#         self.grid_values = {}
+#         self.x_grid_list = []
+#         self.y_grid_list = []
+#
+#     def set_geometry_manager(self, to):
+#         if self.geometry_manager is None:
+#             self.geometry_manager = to
+#             return
+#
+#         if self.geometry_manager != to:
+#             raise f"Can't use multiple geometry managers in one container"
+#
+#     def place(self, *, _):
+#         self.set_geometry_manager("place")
+#
+#     def grid(self, child, *, row, column, row_span=1, column_span=1):
+#         self.children.append(child)
+#         self.grid_values[child] = {row, column}
+#         self.set_geometry_manager("grid")
 
-            self.row = row
-            self.column = column
-            self.row_span = row_span
-            self.column_span = column_span
 
-    def __init__(self, parent, *,
-                 x: None | int = 0,
-                 y: None | int = 0,
-                 rel_x: None | float = 0,
-                 rel_y: None | float = 0,
+class GridCell(Widget):
+    def __init__(self,
+                 parent: Grid,
+                 *,
+                 row: int,
+                 column: int,
+                 row_span: int = 1,
+                 column_span: int = 1):
 
-                 pad_x: list[int, int] = (0, 0),
-                 pad_y: list[int, int] = (0, 0),
-                 ipad_x: list[int, int] = (0, 0),
-                 ipad_y: list[int, int] = (0, 0),
+        super().__init__(parent)
 
-                 min_size: list[int, int] = None,
-                 size: list[int, int] = (0, 0),
-                 max_size: list[int, int] = None,
-                 fill: bool = False,
-                 fit: bool = False,
+        self.row: int = row
+        self.column: int = column
+        self.row_span: int = row_span
+        self.column_span: int = column_span
 
-                 show: bool = True):
+        self.parent: Grid = parent
 
-        # gets all arguments and passes them on to super class
-        sig, current_locals = inspect.signature(self.__init__), locals()
-        args = {param.name: current_locals[param.name] for param in sig.parameters.values()}
-        super().__init__(**args)
+    def place(self, **kwargs):
+        raise AttributeError("type object 'GridPart' has no attribute 'place'")
 
-        self.children = []
+    def un_place(self, **kwargs):
+        raise AttributeError("type object 'GridPart' has no attribute 'un_place'")
 
-        self.geometry_manager: Literal["place", "grid", None] = None
+    def update_pos(self):
+        self.x = round(sum(self.parent.x_grid_size[:self.column]))
+        self.y = round(sum(self.parent.y_grid_size[:self.row]))
 
-        self.grid_values = {}
-        self.x_grid_list = []
-        self.y_grid_list = []
-
-    def set_geometry_manager(self, to):
-        if self.geometry_manager is None:
-            self.geometry_manager = to
-            return
-
-        if self.geometry_manager != to:
-            raise f"Can't use multiple geometry managers in one container"
-
-    def place(self, *, _):
-        self.set_geometry_manager("place")
-
-    def grid(self, child, *, row, column, row_span=1, column_span=1):
-        self.children.append(child)
-        self.grid_values[child] = {row, column}
-        self.set_geometry_manager("grid")
+    def update_size(self):
+        self.size = [round(sum(self.parent.x_grid_size[self.column:self.column + self.column_span])),
+                     round(sum(self.parent.y_grid_size[self.row:self.row + self.row_span]))]
 
 
 class Grid(Widget):
     def __init__(self, parent, *,
-                 x: None | int = 0,
-                 y: None | int = 0,
-                 rel_x: None | float = 0,
-                 rel_y: None | float = 0,
-
-                 pad_x: list[int, int] = (0, 0),
-                 pad_y: list[int, int] = (0, 0),
-                 ipad_x: list[int, int] = (0, 0),
-                 ipad_y: list[int, int] = (0, 0),
-
-                 min_size: list[int, int] = None,
-                 size: list[int, int] = (0, 0),
-                 max_size: list[int, int] = None,
-                 fill: bool = False,
-                 fit: bool = False,
-
                  show: bool = True,
                  **kwargs):
 
@@ -328,17 +328,41 @@ class Grid(Widget):
         args = {param.name: current_locals[param.name] for param in sig.parameters.values()}
         super().__init__(**args)
 
-        self.rect_s = []
+        self.x_grid_size: list[float] = []
+        self.y_grid_size: list[float] = []
 
-        self.x_grid_size = []
-        self.y_grid_size = []
+        self.min_cell_size: list[int, int] = [0, 0]
+        self.children: list[GridCell] = []
 
-        self.children = []
+        self.grid_changed = False
 
-    def grid(self,
-             row,
-             column,
-             row_span=1,
-             column_span=1):
+    def update_grid(self):
+        max_row = max(self.children, key=lambda x: x.row + x.row_span)
+        max_row_index = max_row.row + max_row.row_span
+        self.x_grid_size = [self.min_size[0] for _ in range(max_row_index)]
+        for child in self.children:
+            for i in range(child.row, child.row + child.row_span):
+                self.x_grid_size[i] = max(self.x_grid_size[i], child.min_size[0])
 
-        self.rect_s.append()
+        max_column = max(self.children, key=lambda x: x.column + x.column_span)
+        max_column_index = max_column.column + max_column.column_span
+        self.x_grid_size = [self.min_cell_size[1] for _ in range(max_column_index)]
+        for child in self.children:
+            for i in range(child.column, child.column + child.column_span):
+                self.x_grid_size[i] = max(self.x_grid_size[i], child.min_size[1])
+
+    def construct_cell(self,
+                       row: int,
+                       column: int,
+                       row_span: int = 1,
+                       column_span: int = 1):
+
+        grid_part = GridCell(self,
+                             row=row,
+                             column=column,
+                             row_span=row_span,
+                             column_span=column_span)
+
+        self.children.append(grid_part)
+
+        return grid_part
