@@ -275,10 +275,11 @@ class GridCell(Widget):
 
 
 class WidgetV2:
-    def __init__(self):
-        self.x = 0
-        self.y = 0
+    def __init__(self, parent):
+        self.parent = parent
+        self.children = []
 
+        self.pos: None | list[int, int] = [0, 0]
         self.size: None | list[int, int] = [0, 0]
 
         # different typed of "padding"
@@ -290,8 +291,6 @@ class WidgetV2:
         self.ipad_x: list[int, int] = [0, 0]
         self.ipad_y: list[int, int] = [0, 0]
 
-        self.pos: None | list[int, int] = [0, 0]
-        
     # <editor-fold desc="size">
     @property
     def outer_size(self):
@@ -343,6 +342,45 @@ class WidgetV2:
             value[1] - sum((self.pad_y[0], self.border_y[0], self.ipad_y[0]))
         ]
     # </editor-fold>
+
+    def place(self, *,
+              inner_pos=None,
+              pos=None,
+
+              inner_size: None | list[int, int] = None,
+              size: None | list[int, int] = None,
+              outer_size: None | list[int, int] = None,
+
+              pad_x: None | list[int, int] = None,
+              pad_y: None | list[int, int] = None,
+              border_x: None | list[int, int] = None,
+              border_y: None | list[int, int] = None,
+              ipad_x: None | list[int, int] = None,
+              ipad_y: None | list[int, int] = None,
+              ):
+
+        sig, current_locals = inspect.signature(self.__init__), locals()
+        kwargs = {param.name: current_locals[param.name] for param in sig.parameters.values()}
+
+        for kwarg in kwargs.keys():
+            if kwargs[kwarg] is not None:
+                self.__setattr__(kwarg, kwargs[kwarg])
+
+    def draw(self):
+        """
+        draws self
+        """
+
+    def draw_recursion(self, surface, abs_pos=(0, 0)):
+        inner_pos = self.inner_pos
+
+        for child in self.children:
+            child_pos = [
+                inner_pos[0] + child.pos[0],
+                inner_pos[1] + child.pos[1]
+            ]
+
+            child.draw_recursion(child_pos, surface, abs_pos)
 
 
 class Grid(Widget):
