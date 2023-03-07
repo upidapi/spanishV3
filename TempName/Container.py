@@ -17,18 +17,8 @@ def matrix_add(*args: list | tuple):
     return matrix_map(sum, *args)
 
 
-class PointerVar:
-    def __init__(self, value, handler):
-        """
-        :param handler: where to search for PointerVars
-        :param value: what to search for
-        """
-
-        self.value = value
-        self.handler = handler
-
-    def __getattribute__(self, item):
-        return object.__getattribute__(self.handler, self.value)
+class Window:
+    pass
 
 
 class Widget:
@@ -251,40 +241,6 @@ class Widget:
                                      surface)
 
 
-# class Container(Widget):
-#     def __init__(self, parent, *,
-#                  show: bool = True):
-#
-#         # gets all arguments and passes them on to super class
-#         sig, current_locals = inspect.signature(self.__init__), locals()
-#         args = {param.name: current_locals[param.name] for param in sig.parameters.values()}
-#         super().__init__(**args)
-#
-#         self.children = []
-#
-#         self.geometry_manager: Literal["place", "grid", None] = None
-#
-#         self.grid_values = {}
-#         self.x_grid_list = []
-#         self.y_grid_list = []
-#
-#     def set_geometry_manager(self, to):
-#         if self.geometry_manager is None:
-#             self.geometry_manager = to
-#             return
-#
-#         if self.geometry_manager != to:
-#             raise f"Can't use multiple geometry managers in one container"
-#
-#     def place(self, *, _):
-#         self.set_geometry_manager("place")
-#
-#     def grid(self, child, *, row, column, row_span=1, column_span=1):
-#         self.children.append(child)
-#         self.grid_values[child] = {row, column}
-#         self.set_geometry_manager("grid")
-
-
 class GridCell(Widget):
     def __init__(self,
                  parent: Grid,
@@ -316,6 +272,77 @@ class GridCell(Widget):
     def update_size(self):
         self.size = [round(sum(self.parent.x_grid_size[self.column:self.column + self.column_span])),
                      round(sum(self.parent.y_grid_size[self.row:self.row + self.row_span]))]
+
+
+class WidgetV2:
+    def __init__(self):
+        self.x = 0
+        self.y = 0
+
+        self.size: None | list[int, int] = [0, 0]
+
+        # different typed of "padding"
+        # format [padding to the left/top, padding to the right/bottom]
+        self.pad_x: list[int, int] = [0, 0]
+        self.pad_y: list[int, int] = [0, 0]
+        self.border_x: list[int, int] = [0, 0]
+        self.border_y: list[int, int] = [0, 0]
+        self.ipad_x: list[int, int] = [0, 0]
+        self.ipad_y: list[int, int] = [0, 0]
+
+        self.pos: None | list[int, int] = [0, 0]
+        
+    # <editor-fold desc="size">
+    @property
+    def outer_size(self):
+        outer_size = [
+            self.size[0] + sum(self.pad_x),
+            self.size[1] + sum(self.pad_y),
+        ]
+
+        return outer_size
+
+    @outer_size.setter
+    def outer_size(self, value: list[int, int]):
+        self.size = [
+            value[0] - sum(self.pad_x),
+            value[1] - sum(self.pad_y)
+        ]
+
+    @property
+    def inner_size(self):
+        inner_size = [
+            self.size[0] - sum(self.border_x + self.ipad_x),
+            self.size[1] - sum(self.border_y + self.ipad_y),
+        ]
+
+        return inner_size
+
+    @inner_size.setter
+    def inner_size(self, value: list[int, int]):
+        self.size = [
+            value[0] + sum(self.border_x, self.ipad_x),
+            value[1] + sum(self.border_y, self.ipad_y)
+        ]
+    # </editor-fold>
+
+    # <editor-fold desc="pos">
+    @property
+    def inner_pos(self):
+        inner_pos = [
+            self.pos[0] + sum((self.pad_x[0], self.border_x[0], self.ipad_x[0])),
+            self.pos[1] + sum((self.pad_y[0], self.border_y[0], self.ipad_y[0]))
+        ]
+
+        return inner_pos
+
+    @inner_pos.setter
+    def inner_pos(self, value):
+        self.pos = [
+            value[0] - sum((self.pad_x[0], self.border_x[0], self.ipad_x[0])),
+            value[1] - sum((self.pad_y[0], self.border_y[0], self.ipad_y[0]))
+        ]
+    # </editor-fold>
 
 
 class Grid(Widget):
