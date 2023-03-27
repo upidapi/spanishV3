@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 import inspect
 
 
@@ -14,6 +16,9 @@ class Widget:
         self.parent = parent
         self.children = []
 
+        self.size_depends_on: Literal["parent", "children", None]
+        self.pos_depends_on: Literal["parent", "children", None]
+        
         self._changed = False
 
         # should self be drawn or not
